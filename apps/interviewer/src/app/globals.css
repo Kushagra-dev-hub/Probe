@@ -1,0 +1,102 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-primary: #4A7CFF;
+  --color-primary-light: rgba(74, 124, 255, 0.1);
+  --color-primary-dark: #3a63cc;
+  --color-bg-light: #FAFBFC;
+  --color-lc-bg: #1a1a1a;
+  --color-lc-surface: #282828;
+  --color-lc-border: #3e3e3e;
+  --color-lc-hover: #333333;
+  --color-lc-input: #3a3a3a;
+  --color-lc-elevated: #303030;
+  --font-sans: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'Outfit', sans-serif;
+  --font-nunito: 'Nunito', sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: 'Outfit', sans-serif;
+  background-color: var(--color-bg-light);
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Nunito', sans-serif;
+}
+
+.dark body,
+body.dark {
+  background-color: var(--color-lc-bg);
+  color: #eff1f6;
+}
+
+.font-nunito {
+  font-family: 'Nunito', sans-serif;
+}
+
+.material-symbols-outlined,
+.material-symbols-rounded {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+:root {
+  --scrollbar-size: 8px;
+  --scrollbar-thumb: rgba(15, 23, 42, 0.18);
+  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.32);
+  --scrollbar-track: transparent;
+}
+
+.dark {
+  --scrollbar-thumb: rgba(226, 232, 240, 0.18);
+  --scrollbar-thumb-hover: rgba(226, 232, 240, 0.32);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar { width: var(--scrollbar-size); height: var(--scrollbar-size); }
+*::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+*::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*:hover::-webkit-scrollbar-thumb { background-color: var(--scrollbar-thumb-hover); }
+
+.custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 9999px;
+}

@@ -1,0 +1,225 @@
+// Probe — simplified interview-room schema (two roles: interviewer, interviewee).
+// See C:\probe\CLAUDE.md §3 for the domain model.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  interviewer
+  interviewee
+}
+
+enum InterviewStatus {
+  scheduled
+  interviewer_joined
+  candidate_waiting
+  active
+  completed
+  cancelled
+  no_show
+}
+
+enum Recommendation {
+  pending
+  hire
+  hold
+  reject
+}
+
+/// A person who can join a room. `id` mirrors the Supabase auth user id.
+model User {
+  id        String   @id
+  email     String?  @unique
+  name      String
+  avatarUrl String?  @map("avatar_url")
+  username  String?  @unique
+  role      Role
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  interviewsAsInterviewer Interview[] @relation("InterviewerInterviews")
+  interviewsAsInterviewee Interview[] @relation("IntervieweeInterviews")
+
+  @@map("users")
+}
+
+/// A scheduled 1:1 interview session.
+model Interview {
+  id                  String          @id @default(uuid())
+  interviewerId       String          @map("interviewer_id")
+  intervieweeId       String          @map("interviewee_id")
+  status              InterviewStatus @default(scheduled)
+  scheduledAt         DateTime?       @map("scheduled_at")
+  timezone            String?
+  durationMinutes     Int             @default(60) @map("duration_minutes")
+  startedAt           DateTime?       @map("started_at")
+  endedAt             DateTime?       @map("ended_at")
+  activeQuestionId    String?         @map("active_question_id")
+  activeQuestionIndex Int             @default(0) @map("active_question_index")
+  candidateInstructions String?       @map("candidate_instructions")
+  interviewerNotes    String?         @map("interviewer_notes")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  interviewer User @relation("InterviewerInterviews", fields: [interviewerId], references: [id], onDelete: Cascade)
+  interviewee User @relation("IntervieweeInterviews", fields: [intervieweeId], references: [id], onDelete: Cascade)
+
+  questions   InterviewQuestion[]
+  roomSession RoomSession?
+  evaluation  RoomEvaluation?
+
+  @@index([interviewerId])
+  @@index([intervieweeId])
+  @@map("interviews")
+}
+
+/// A question attached to an interview (may reference a bank question or be inline).
+model InterviewQuestion {
+  id          String   @id @default(uuid())
+  interviewId String   @map("interview_id")
+  questionId  String?  @map("question_id")
+  text        String
+  setTitle    String?  @map("set_title")
+  type        String?
+  source      String?
+  difficulty  String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  interview Interview      @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  bankQuestion Question?   @relation(fields: [questionId], references: [id])
+
+  @@index([interviewId])
+  @@map("interview_questions")
+}
+
+/// Reusable question bank (statement, examples, starter code, solution, tests).
+model Question {
+  id          String   @id @default(uuid())
+  title       String
+  statement   String?
+  description String?
+  difficulty  String?
+  language    String?
+  examples    Json?
+  constraints Json?
+  starterCode Json?    @map("starter_code")
+  codeSnippets Json?   @map("code_snippets")
+  hints       Json?
+  solution    Json?
+  sampleTests Json?    @map("sample_tests")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  interviewQuestions InterviewQuestion[]
+
+  @@map("questions")
+}
+
+/* ------------------------------------------------------------------ *
+ * Runtime / room tables (ported from reference manual-sql).
+ * ------------------------------------------------------------------ */
+
+model RoomSession {
+  id                      String    @id @default(uuid())
+  interviewId             String    @unique @map("interview_id")
+  status                  String    @default("scheduled")
+  interviewerJoinedAt     DateTime? @map("interviewer_joined_at")
+  candidateFirstWaitingAt DateTime? @map("candidate_first_waiting_at")
+  candidateAdmittedAt     DateTime? @map("candidate_admitted_at")
+  startedAt               DateTime? @map("started_at")
+  endedAt                 DateTime? @map("ended_at")
+  activeQuestionId        String?   @map("active_question_id")
+  activeQuestionIndex     Int       @default(0) @map("active_question_index")
+  activeQuestionRevealedAt DateTime? @map("active_question_revealed_at")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  interview    Interview           @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  participants RoomParticipant[]
+  events       RoomEvent[]
+  snapshots    RoomCodeSnapshot[]
+  evaluation   RoomEvaluation?
+
+  @@map("room_sessions")
+}
+
+model RoomParticipant {
+  id            String    @id @default(uuid())
+  roomSessionId String    @map("room_session_id")
+  userId        String    @map("user_id")
+  role          Role
+  admittedAt    DateTime? @map("admitted_at")
+  firstJoinedAt DateTime  @default(now()) @map("first_joined_at")
+  lastJoinedAt  DateTime  @default(now()) @map("last_joined_at")
+  lastSeenAt    DateTime? @map("last_seen_at")
+  disconnectedAt DateTime? @map("disconnected_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  roomSession RoomSession @relation(fields: [roomSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([roomSessionId, role, userId])
+  @@map("room_participants")
+}
+
+model RoomEvent {
+  id            String   @id @default(uuid())
+  roomSessionId String   @map("room_session_id")
+  actorUserId   String?  @map("actor_user_id")
+  actorRole     String?  @map("actor_role")
+  eventType     String   @map("event_type")
+  payload       Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  roomSession RoomSession @relation(fields: [roomSessionId], references: [id], onDelete: Cascade)
+
+  @@index([roomSessionId, createdAt])
+  @@map("room_events")
+}
+
+model RoomCodeSnapshot {
+  id            String   @id @default(uuid())
+  roomSessionId String   @map("room_session_id")
+  interviewId   String   @map("interview_id")
+  questionId    String?  @map("question_id")
+  language      String   @default("javascript")
+  code          String   @default("")
+  revision      Int      @default(0)
+  updatedByUserId String? @map("updated_by_user_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  roomSession RoomSession @relation(fields: [roomSessionId], references: [id], onDelete: Cascade)
+
+  @@index([roomSessionId, questionId])
+  @@map("room_code_snapshots")
+}
+
+model RoomEvaluation {
+  id                String         @id @default(uuid())
+  roomSessionId     String         @unique @map("room_session_id")
+  interviewId       String         @unique @map("interview_id")
+  interviewerUserId String         @map("interviewer_user_id")
+  score             Int?
+  recommendation    Recommendation @default(pending)
+  strengths         String[]       @default([])
+  concerns          String[]       @default([])
+  notes             String?
+  payload           Json           @default("{}")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  roomSession RoomSession @relation(fields: [roomSessionId], references: [id], onDelete: Cascade)
+  interview   Interview   @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  @@index([interviewerUserId])
+  @@map("room_evaluations")
+}

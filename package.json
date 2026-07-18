@@ -1,0 +1,24 @@
+{
+  "name": "probe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone live-coding interview room (interviewer + interviewee).",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:expert": "npm run dev --workspace @probe/expert",
+    "dev:interviewer": "npm run dev --workspace @probe/interviewer",
+    "dev:interviewee": "npm run dev --workspace @probe/interviewee",
+    "db:generate": "npm run generate --workspace @probe/db",
+    "db:push": "npm run push --workspace @probe/db",
+    "db:seed": "npm run seed --workspace @probe/db",
+    "db:reset": "npm run reset --workspace @probe/db",
+    "build": "npm run build --workspaces --if-present",
+    "type-check": "npm run type-check --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

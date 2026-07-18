@@ -1,0 +1,29 @@
+{
+  "name": "@probe/expert",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "dev:plain": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.0",
+    "@probe/contract": "*",
+    "@probe/db": "*",
+    "@supabase/supabase-js": "^2.49.0",
+    "dotenv": "^16.4.0",
+    "fastify": "^5.2.0",
+    "socket.io": "^4.8.3",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
