@@ -976,14 +976,14 @@ function InterviewerRoom() {
     }, [sessionEnded, teardownMedia]);
 
     useEffect(() => {
-        if (!(sessionEnded || ended) || seededEvalRef.current) return;
+        if (!(sessionEnded || ended || status === "completed") || seededEvalRef.current) return;
         seededEvalRef.current = true;
         if (evaluation?.strengths?.length) setEvaluationStrengths(evaluation.strengths);
         if (evaluation?.concerns?.length) setEvaluationConcerns(evaluation.concerns);
         if (evaluation?.score != null && !evaluationScore) setEvaluationScore(String(evaluation.score));
         if (evaluation?.recommendation && evaluationRecommendation === "pending") setEvaluationRecommendation(evaluation.recommendation as "pending" | "hire" | "hold" | "reject");
         if (evaluation?.notes && !evaluationNotes) setEvaluationNotes(evaluation.notes);
-    }, [ended, evaluation, evaluationNotes, evaluationRecommendation, evaluationScore, sessionEnded]);
+    }, [ended, evaluation, evaluationNotes, evaluationRecommendation, evaluationScore, sessionEnded, status]);
 
     useEffect(() => {
         return () => {
@@ -1052,7 +1052,7 @@ function InterviewerRoom() {
             });
             setFinishing(false);
         }
-        router.push("/direct-interviews");
+        router.push("/");
     }, [evaluationConcerns, evaluationNotes, evaluationRecommendation, evaluationScore, evaluationStrengths, router, saveEvaluation]);
 
     if (loading) {
@@ -1080,7 +1080,7 @@ function InterviewerRoom() {
         );
     }
 
-    if (sessionEnded || ended) {
+    if (sessionEnded || ended || status === "completed") {
         return (
             <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#FAFBFC] px-4 py-10 dark:bg-lc-bg">
                 <div className="mx-auto max-w-2xl">
@@ -1592,15 +1592,21 @@ function InterviewerRoom() {
                                                     <p className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400">{bootstrap?.candidate.email || "—"}</p>
                                                 </div>
                                             </div>
-                                            {lobbyRequest && !admitted ? (
-                                                <button type="button" onClick={admitCandidate} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-600">
-                                                    <span className="material-symbols-outlined text-[18px]">door_open</span>
-                                                    Admit candidate
-                                                </button>
+                                            {!admitted ? (
+                                                <>
+                                                    <button type="button" onClick={admitCandidate} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-600">
+                                                        <span className="material-symbols-outlined text-[18px]">door_open</span>
+                                                        Admit candidate
+                                                    </button>
+                                                    <p className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
+                                                        <span className="material-symbols-outlined text-[14px]">{lobbyRequest ? "hourglass_top" : "info"}</span>
+                                                        {lobbyRequest ? "Candidate is waiting in the lobby." : "Admit now, or once the candidate joins the lobby."}
+                                                    </p>
+                                                </>
                                             ) : (
                                                 <div className="mt-3 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500 dark:bg-lc-surface dark:text-slate-400">
-                                                    <span className="material-symbols-outlined text-[16px]">{admitted ? "check_circle" : "hourglass_empty"}</span>
-                                                    {admitted ? "Candidate is in the room." : "Waiting for the candidate to join the lobby."}
+                                                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                                                    Candidate is in the room.
                                                 </div>
                                             )}
                                         </div>

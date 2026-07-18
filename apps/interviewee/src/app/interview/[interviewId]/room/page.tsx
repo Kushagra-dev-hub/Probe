@@ -831,7 +831,7 @@ function CandidateRoom() {
 
     useEffect(() => {
         if (!sessionEnded) return;
-        const timer = window.setTimeout(() => router.push("/scheduled"), 6000);
+        const timer = window.setTimeout(() => router.push("/"), 6000);
         return () => window.clearTimeout(timer);
     }, [router, sessionEnded]);
 
@@ -903,7 +903,7 @@ function CandidateRoom() {
         );
     }
 
-    if (sessionEnded) {
+    if (sessionEnded || status === "completed") {
         return (
             <div className="fixed inset-0 z-[100] grid place-items-center bg-[#FAFBFC] px-6 dark:bg-lc-bg">
                 <div className="max-w-md space-y-6 text-center">
@@ -914,11 +914,11 @@ function CandidateRoom() {
                         <h1 className="font-nunito text-2xl font-bold text-slate-900 dark:text-white">Interview complete</h1>
                         <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">Thanks for your time. The team is reviewing your interview and you&apos;ll be notified here when there&apos;s an update.</p>
                     </div>
-                    <button type="button" onClick={() => router.push("/scheduled")} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary/90">
+                    <button type="button" onClick={() => router.push("/")} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary/90">
                         <span className="material-symbols-outlined text-[18px]">event</span>
                         Go to my interviews
                     </button>
-                    <p className="text-xs font-semibold text-slate-400">Redirecting you shortly…</p>
+                    {sessionEnded && <p className="text-xs font-semibold text-slate-400">Redirecting you shortly…</p>}
                 </div>
             </div>
         );
@@ -928,7 +928,7 @@ function CandidateRoom() {
         return (
             <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#FAFBFC] px-6 dark:bg-lc-bg">
                 <div className="max-w-md space-y-6 text-center">
-                    <button type="button" onClick={() => router.push("/scheduled")} className="mx-auto inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition-colors hover:text-primary dark:text-slate-300">
+                    <button type="button" onClick={() => router.push("/")} className="mx-auto inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition-colors hover:text-primary dark:text-slate-300">
                         <span className="material-symbols-outlined text-[18px]">arrow_back</span>
                         Scheduled
                     </button>
@@ -966,7 +966,7 @@ function CandidateRoom() {
             <div className="flex h-full flex-col">
                 <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 dark:border-lc-border dark:bg-lc-surface sm:px-5">
                     <div className="flex min-w-0 items-center gap-4">
-                        <button type="button" onClick={() => router.push("/scheduled")} className="flex size-8 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition-colors hover:bg-slate-100 dark:border-lc-border dark:text-slate-200 dark:hover:bg-lc-border" title="Scheduled">
+                        <button type="button" onClick={() => router.push("/")} className="flex size-8 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition-colors hover:bg-slate-100 dark:border-lc-border dark:text-slate-200 dark:hover:bg-lc-border" title="Scheduled">
                             <span className="material-symbols-outlined text-[17px]">arrow_back</span>
                         </button>
                         <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
