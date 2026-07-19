@@ -77,7 +77,7 @@ export function ProfileDropdown() {
                 }}
                 className="rounded-full cursor-pointer hover:opacity-90 transition-all"
             >
-                <div className="size-9 rounded-full bg-rose-900 flex items-center justify-center text-white font-bold text-xs overflow-hidden hover:ring-2 hover:ring-rose-900/30">
+                <div className="size-9 rounded-full bg-gradient-to-br from-steel to-mint flex items-center justify-center text-night font-bold text-xs overflow-hidden hover:ring-2 hover:ring-mint/30">
                     {initial}
                 </div>
             </button>

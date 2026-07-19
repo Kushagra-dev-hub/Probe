@@ -12,9 +12,9 @@ type Props = {
 };
 
 const DIFFICULTY_STYLE: Record<string, string> = {
-  easy: "text-emerald-600",
-  medium: "text-amber-600",
-  hard: "text-rose-600",
+  easy: "text-emerald-300",
+  medium: "text-amber-300",
+  hard: "text-rose-300",
 };
 
 export function InterviewForm({ existing }: Props) {
@@ -100,10 +100,10 @@ export function InterviewForm({ existing }: Props) {
   if (loadError) {
     const roleMismatch = /interviewer access required/i.test(loadError);
     return (
-      <div className="rounded-lg bg-rose-50 p-4 text-sm text-rose-700">
+      <div className="rounded-lg bg-rose-500/10 p-4 text-sm text-rose-300 border border-rose-500/20">
         <p>Failed to load form data: {loadError}</p>
         {roleMismatch && (
-          <p className="mt-2 text-rose-600">
+          <p className="mt-2 text-rose-300">
             This tab is signed in as an interviewee. Reload with{" "}
             <a href="/?token=seed-interviewer" className="font-semibold underline">
               ?token=seed-interviewer
@@ -115,16 +115,16 @@ export function InterviewForm({ existing }: Props) {
     );
   }
   if (!resources) {
-    return <p className="text-sm text-slate-500">Loading question bank…</p>;
+    return <p className="text-sm text-haze/60">Loading question bank…</p>;
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {/* Interviewee */}
       <section>
-        <label className="mb-2 block text-sm font-semibold text-slate-700">Interviewee</label>
+        <label className="mb-2 block text-sm font-semibold text-haze">Interviewee</label>
         {resources.interviewees.length === 0 ? (
-          <p className="text-sm text-slate-500">No interviewees exist yet. Seed one first.</p>
+          <p className="text-sm text-haze/60">No interviewees exist yet. Seed one first.</p>
         ) : (
           <div className="grid gap-2 sm:grid-cols-2">
             {resources.interviewees.map((c) => (
@@ -135,15 +135,15 @@ export function InterviewForm({ existing }: Props) {
                 className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${
                   intervieweeId === c.id
                     ? "border-primary bg-primary/5 ring-1 ring-primary"
-                    : "border-slate-200 hover:border-slate-300"
+                    : "border-steel/15 hover:border-steel/25"
                 }`}
               >
-                <span className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-sm font-semibold text-slate-600">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-grape/50 text-sm font-semibold text-mint">
                   {c.name.charAt(0).toUpperCase()}
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-slate-800">{c.name}</span>
-                  <span className="block truncate text-xs text-slate-500">{c.email}</span>
+                  <span className="block truncate text-sm font-medium text-haze">{c.name}</span>
+                  <span className="block truncate text-xs text-haze/60">{c.email}</span>
                 </span>
               </button>
             ))}
@@ -154,8 +154,8 @@ export function InterviewForm({ existing }: Props) {
       {/* Questions */}
       <section>
         <div className="mb-2 flex items-center justify-between">
-          <label className="text-sm font-semibold text-slate-700">Questions</label>
-          <span className="text-xs text-slate-500">{selectedQuestions.length} selected</span>
+          <label className="text-sm font-semibold text-haze">Questions</label>
+          <span className="text-xs text-haze/60">{selectedQuestions.length} selected</span>
         </div>
         <div className="space-y-2">
           {resources.questions.map((q) => {
@@ -164,7 +164,7 @@ export function InterviewForm({ existing }: Props) {
               <label
                 key={q.id}
                 className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${
-                  checked ? "border-primary bg-primary/5" : "border-slate-200 hover:border-slate-300"
+                  checked ? "border-primary bg-primary/5" : "border-steel/15 hover:border-steel/25"
                 }`}
               >
                 <input
@@ -173,13 +173,13 @@ export function InterviewForm({ existing }: Props) {
                   onChange={() => toggleQuestion(q.id)}
                   className="h-4 w-4 accent-primary"
                 />
-                <span className="flex-1 text-sm font-medium text-slate-800">{q.title}</span>
+                <span className="flex-1 text-sm font-medium text-haze">{q.title}</span>
                 {q.difficulty && (
-                  <span className={`text-xs font-semibold capitalize ${DIFFICULTY_STYLE[q.difficulty] ?? "text-slate-500"}`}>
+                  <span className={`text-xs font-semibold capitalize ${DIFFICULTY_STYLE[q.difficulty] ?? "text-haze/60"}`}>
                     {q.difficulty}
                   </span>
                 )}
-                {q.language && <span className="text-xs text-slate-400">{q.language}</span>}
+                {q.language && <span className="text-xs text-haze/60">{q.language}</span>}
               </label>
             );
           })}
@@ -187,12 +187,12 @@ export function InterviewForm({ existing }: Props) {
       </section>
 
       {/* Role pack (Probe copilot) */}
-      <section className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
+      <section className="rounded-xl border border-steel/15 bg-grape/20 p-4">
         <div className="mb-1 flex items-center gap-2">
-          <span className="grid h-6 w-6 place-items-center rounded-md bg-indigo-600 text-[11px] font-bold text-white">P</span>
-          <label className="text-sm font-semibold text-slate-700">Probe role pack</label>
+          <span className="grid h-6 w-6 place-items-center rounded-md bg-steel text-[11px] font-bold text-white">P</span>
+          <label className="text-sm font-semibold text-haze">Probe role pack</label>
         </div>
-        <p className="mb-3 text-xs text-slate-500">
+        <p className="mb-3 text-xs text-haze/60">
           Paste the role and JD — Probe builds the rubric it will coach you against during the interview. Leave blank for a
           general strong-engineer pack.
         </p>
@@ -201,14 +201,14 @@ export function InterviewForm({ existing }: Props) {
             value={roleTitle}
             onChange={(e) => setRoleTitle(e.target.value)}
             placeholder="Role title, e.g. Backend Engineer (Go, Postgres)"
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-steel/25 bg-night/50 px-3 py-2 text-sm text-white placeholder:text-haze/50 focus:border-steel focus:outline-none focus:ring-1 focus:ring-steel/30"
           />
           <textarea
             value={jdText}
             onChange={(e) => setJdText(e.target.value)}
             rows={4}
             placeholder="Paste the job description here…"
-            className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full resize-none rounded-lg border border-steel/25 bg-night/50 px-3 py-2 text-sm text-white placeholder:text-haze/50 focus:border-steel focus:outline-none focus:ring-1 focus:ring-steel/30"
           />
         </div>
       </section>
@@ -216,23 +216,23 @@ export function InterviewForm({ existing }: Props) {
       {/* Schedule + duration */}
       <section className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-2 block text-sm font-semibold text-slate-700">Scheduled time</label>
+          <label className="mb-2 block text-sm font-semibold text-haze">Scheduled time</label>
           <input
             type="datetime-local"
             value={scheduledAt}
             onChange={(e) => setScheduledAt(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-steel/25 bg-night/50 px-3 py-2 text-sm text-white focus:border-steel focus:outline-none focus:ring-1 focus:ring-steel/30"
           />
         </div>
         <div>
-          <label className="mb-2 block text-sm font-semibold text-slate-700">Duration (minutes)</label>
+          <label className="mb-2 block text-sm font-semibold text-haze">Duration (minutes)</label>
           <input
             type="number"
             min={15}
             max={480}
             value={durationMinutes}
             onChange={(e) => setDurationMinutes(Number(e.target.value))}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-steel/25 bg-night/50 px-3 py-2 text-sm text-white focus:border-steel focus:outline-none focus:ring-1 focus:ring-steel/30"
           />
         </div>
       </section>
@@ -240,45 +240,45 @@ export function InterviewForm({ existing }: Props) {
       {/* Notes */}
       <section className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-2 block text-sm font-semibold text-slate-700">
-            Interviewer notes <span className="font-normal text-slate-400">(private)</span>
+          <label className="mb-2 block text-sm font-semibold text-haze">
+            Interviewer notes <span className="font-normal text-haze/60">(private)</span>
           </label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
             placeholder="Focus areas, rubric reminders…"
-            className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full resize-none rounded-lg border border-steel/25 bg-night/50 px-3 py-2 text-sm text-white placeholder:text-haze/50 focus:border-steel focus:outline-none focus:ring-1 focus:ring-steel/30"
           />
         </div>
         <div>
-          <label className="mb-2 block text-sm font-semibold text-slate-700">
-            Candidate instructions <span className="font-normal text-slate-400">(shown in room)</span>
+          <label className="mb-2 block text-sm font-semibold text-haze">
+            Candidate instructions <span className="font-normal text-haze/60">(shown in room)</span>
           </label>
           <textarea
             value={candidateInstructions}
             onChange={(e) => setCandidateInstructions(e.target.value)}
             rows={3}
             placeholder="What to expect, allowed resources…"
-            className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full resize-none rounded-lg border border-steel/25 bg-night/50 px-3 py-2 text-sm text-white placeholder:text-haze/50 focus:border-steel focus:outline-none focus:ring-1 focus:ring-steel/30"
           />
         </div>
       </section>
 
-      {error && <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
+      {error && <p className="rounded-lg bg-rose-500/10 p-3 text-sm text-rose-300 border border-rose-500/20">{error}</p>}
 
       <div className="flex items-center gap-3">
         <button
           type="submit"
           disabled={!canSubmit}
-          className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-night transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? "Saving…" : existing ? "Save changes" : "Create interview"}
         </button>
         <button
           type="button"
           onClick={() => router.push("/")}
-          className="rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
+          className="rounded-lg px-4 py-2.5 text-sm font-medium text-haze transition hover:bg-grape/40"
         >
           Cancel
         </button>

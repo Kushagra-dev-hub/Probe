@@ -14,26 +14,52 @@ html {
 }
 
 @theme inline {
-  /* Brand Colors */
-  --color-primary: #4A7CFF;
-  --color-primary-light: rgba(74, 124, 255, 0.1);
-  --color-primary-dark: #3a63cc;
+  /* ── Probe dark palette (dark-only redesign) ──
+     night  = main background      #03001C
+     grape  = elevated surfaces    #301E67
+     steel  = secondary accent     #5B8FB9
+     mint   = supporting highlight #B6EADA
+     haze   = cool neutral body text */
+  --color-night: #03001C;
+  --color-grape: #301E67;
+  --color-steel: #5B8FB9;
+  --color-mint: #B6EADA;
+  --color-haze: #A9B2D0;
 
-  /* Backgrounds */
-  --color-bg-light: #FAFBFC;
-  --color-bg-dark: #1c160d;
-  --color-editor-bg: #F8F9FC;
+  /* Brand Colors — primary now maps to the mint highlight (dark palette) */
+  --color-primary: #B6EADA;
+  --color-primary-light: rgba(182, 234, 218, 0.12);
+  --color-primary-dark: #97dcc9;
 
-  /* LeetCode-inspired Dark Theme */
-  --color-lc-bg: #1a1a1a;
-  --color-lc-surface: #282828;
-  --color-lc-border: #3e3e3e;
-  --color-lc-hover: #333333;
-  --color-lc-input: #3a3a3a;
-  --color-lc-elevated: #303030;
+  /* Backgrounds — all mapped onto the night base */
+  --color-bg-light: #03001C;
+  --color-bg-dark: #03001C;
+  --color-editor-bg: #150d33;
+
+  /* Surfaces (kept under the legacy lc-* names so existing markup re-skins) */
+  --color-lc-bg: #03001C;
+  --color-lc-surface: #1c1140;
+  --color-lc-border: #3a2c63;
+  --color-lc-hover: #2a1a52;
+  --color-lc-input: #170e36;
+  --color-lc-elevated: #2a1a52;
 
   /* Accent */
-  --color-indigo-accent: #6366F1;
+  --color-indigo-accent: #B6EADA;
+
+  /* Brand hues (blue/indigo) remapped to the steel accent so brand chrome
+     across the rooms/copilot picks up the palette. Semantic hues
+     (emerald/red/amber/rose) are intentionally left at their defaults. */
+  --color-blue-300: #a9c5de;
+  --color-blue-400: #7fa8c9;
+  --color-blue-500: #5B8FB9;
+  --color-blue-600: #5B8FB9;
+  --color-blue-700: #4a7699;
+  --color-indigo-300: #a9c5de;
+  --color-indigo-400: #7fa8c9;
+  --color-indigo-500: #5B8FB9;
+  --color-indigo-600: #5B8FB9;
+  --color-indigo-700: #4a7699;
 
   /* Social Brands */
   --color-brand-google: #4285F4;
@@ -742,26 +768,15 @@ pre,
   transition: color 0.45s ease;
 }
 
-/* Anti-flash: apply dark background before React hydrates (script in <head> sets this) */
-html[data-dark="true"] {
-  background-color: #222222;
+/* Dark-only app: the night base everywhere, no light flash */
+html {
   color-scheme: dark;
 }
 
-/* Interview Types page specific backgrounds to prevent white flash */
 html[data-dark="true"] body,
-.dark body {
-  background-color: #222222;
-}
-
+.dark body,
 body {
-  background-color: #f4f5f7;
-}
-
-@media (prefers-color-scheme: dark) {
-  body {
-    background-color: #222222;
-  }
+  background-color: #03001C;
 }
 
 /* Logo: always blue, no filter transition needed */

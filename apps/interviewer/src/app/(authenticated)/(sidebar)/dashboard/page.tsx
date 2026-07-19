@@ -51,36 +51,36 @@ export default function InterviewerDashboard() {
     <main className="mx-auto max-w-5xl px-6 py-10">
       <header className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Interviews</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-white">Interviews</h1>
+          <p className="mt-1 text-sm text-haze/60">
             {me ? `Signed in as ${me.name} (${me.role})` : "Interviewer dashboard"}
           </p>
         </div>
         <Link
           href="/new"
-          className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-dark"
+          className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-night transition hover:bg-primary-dark"
         >
           + New interview
         </Link>
       </header>
 
       {me && me.role !== "interviewer" && (
-        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="mb-6 rounded-lg border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-amber-300">
           You're signed in as an <b>{me.role}</b> on the interviewer app, so creating/editing interviews is
           disabled. Reload with{" "}
-          <a href="/?token=seed-interviewer" className="font-semibold underline">
+          <a href="/?token=seed-interviewer" className="font-semibold underline text-amber-200">
             ?token=seed-interviewer
           </a>{" "}
           to switch identity.
         </div>
       )}
 
-      {loading && <p className="text-sm text-slate-500">Loading…</p>}
-      {error && <p className="rounded-lg bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
+      {loading && <p className="text-sm text-haze/60">Loading…</p>}
+      {error && <p className="rounded-lg bg-rose-500/10 p-4 text-sm text-rose-300 border border-rose-500/20">{error}</p>}
 
       {!loading && !error && interviews.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-slate-300 p-12 text-center">
-          <p className="text-sm text-slate-500">No interviews yet.</p>
+        <div className="rounded-2xl border border-dashed border-steel/20 p-12 text-center">
+          <p className="text-sm text-haze/60">No interviews yet.</p>
           <Link href="/new" className="mt-3 inline-block text-sm font-semibold text-primary hover:underline">
             Create your first interview →
           </Link>
@@ -109,7 +109,7 @@ export default function InterviewerDashboard() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-8">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</h2>
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-haze/60">{title}</h2>
       <div className="space-y-3">{children}</div>
     </section>
   );
@@ -136,22 +136,22 @@ function InterviewCard({ interview, onChanged }: { interview: InterviewSummary; 
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-steel/15 bg-grape/25 p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-sm font-semibold text-slate-600">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-grape/50 text-sm font-semibold text-mint">
               {interview.interviewee.name.charAt(0).toUpperCase()}
             </span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-900">{interview.interviewee.name}</p>
-              <p className="truncate text-xs text-slate-500">{interview.interviewee.email}</p>
+              <p className="truncate text-sm font-semibold text-white">{interview.interviewee.name}</p>
+              <p className="truncate text-xs text-haze/60">{interview.interviewee.email}</p>
             </div>
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-haze/60">
             <span title={interview.scheduledAt ?? ""}>
               🗓 {formatSchedule(interview.scheduledAt)}
-              {interview.scheduledAt && <span className="ml-1 text-slate-400">({relativeToNow(interview.scheduledAt)})</span>}
+              {interview.scheduledAt && <span className="ml-1 text-haze/60">({relativeToNow(interview.scheduledAt)})</span>}
             </span>
             <span>⏱ {interview.durationMinutes} min</span>
             <span>📝 {interview.questionCount} question{interview.questionCount === 1 ? "" : "s"}</span>
@@ -170,38 +170,38 @@ function InterviewCard({ interview, onChanged }: { interview: InterviewSummary; 
         </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-4">
+      <div className="mt-4 flex items-center gap-2 border-t border-steel/15 pt-4">
         {readiness.canJoin ? (
           <Link
             href={roomUrl}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+            className="rounded-lg bg-mint px-4 py-2 text-sm font-semibold text-night transition hover:bg-primary-dark"
           >
             Join room
           </Link>
         ) : (
           <span
-            className="cursor-not-allowed rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-400"
+            className="cursor-not-allowed rounded-lg bg-grape/40 px-4 py-2 text-sm font-medium text-haze/60"
             title={readiness.reason}
           >
             Join room
           </span>
         )}
         {!readiness.canJoin && readiness.reason && (
-          <span className="text-xs text-slate-400">{readiness.reason}</span>
+          <span className="text-xs text-haze/60">{readiness.reason}</span>
         )}
         <div className="ml-auto flex items-center gap-1">
           {!readiness.isTerminal && (
             <>
               <Link
                 href={`/interview/${interview.id}/edit`}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-haze transition hover:bg-grape/40"
               >
                 Edit
               </Link>
               <button
                 onClick={cancel}
                 disabled={busy}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-rose-300 transition hover:bg-rose-500/10 disabled:opacity-50"
               >
                 Cancel
               </button>

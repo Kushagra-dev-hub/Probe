@@ -104,7 +104,7 @@ export function ModalDialog({
             />
 
             {/* Modal */}
-            <div className="relative bg-white dark:bg-[#282828] rounded-lg shadow-2xl max-w-lg w-full border border-slate-200 dark:border-[#3e3e3e] animate-in fade-in zoom-in duration-200">
+            <div className="relative bg-grape/25 dark:bg-lc-surface rounded-lg shadow-2xl max-w-lg w-full border border-steel/15 dark:border-lc-border animate-in fade-in zoom-in duration-200">
                 {/* Icon Section */}
                 <div className={`flex justify-center pt-8 pb-6 ${bgColor} rounded-t-lg border-b ${borderColor}`}>
                     <div className={iconColor}>{icon}</div>
@@ -112,20 +112,20 @@ export function ModalDialog({
 
                 {/* Content */}
                 <div className="p-6">
-                    <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-3 text-center">
+                    <h3 className="text-xl font-semibold text-white dark:text-white mb-3 text-center">
                         {title}
                     </h3>
-                    <p className="text-slate-600 dark:text-slate-300 text-center mb-4">
+                    <p className="text-haze dark:text-slate-300 text-center mb-4">
                         {message}
                     </p>
 
                     {/* Details Section (for errors, etc.) */}
                     {details && (
-                        <div className="mt-4 p-4 bg-slate-50 dark:bg-[#1c160d] rounded border border-slate-200 dark:border-[#3e3e3e]">
-                            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                        <div className="mt-4 p-4 bg-grape/20 dark:bg-lc-input rounded border border-steel/15 dark:border-lc-border">
+                            <p className="text-sm font-medium text-haze dark:text-slate-300 mb-2">
                                 Details:
                             </p>
-                            <pre className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap overflow-x-auto max-h-60">
+                            <pre className="text-sm text-haze/60 dark:text-slate-400 whitespace-pre-wrap overflow-x-auto max-h-60">
 {details}
                             </pre>
                         </div>
@@ -136,7 +136,7 @@ export function ModalDialog({
                 <div className="px-6 pb-6">
                     <button
                         onClick={onClose}
-                        className="w-full px-4 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 dark:focus:ring-offset-[#282828]"
+                        className="w-full px-4 py-3 bg-mint text-night hover:bg-primary-dark rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-mint/40 focus:ring-offset-2 dark:focus:ring-offset-lc-surface"
                     >
                         OK
                     </button>

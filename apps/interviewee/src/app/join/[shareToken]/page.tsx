@@ -510,7 +510,7 @@ function JoinNowCard({
         <button
           type="button"
           onClick={onJoin}
-          className="animate-pulse-glow inline-flex items-center gap-2.5 rounded-xl bg-primary px-10 py-4 font-nunito text-lg font-extrabold text-white shadow-lg shadow-primary/25 transition hover:bg-primary-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 dark:focus-visible:ring-offset-lc-surface"
+          className="animate-pulse-glow inline-flex items-center gap-2.5 rounded-xl bg-primary px-10 py-4 font-nunito text-lg font-extrabold text-night shadow-lg shadow-primary/25 transition hover:bg-primary-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 dark:focus-visible:ring-offset-lc-surface"
         >
           <span className="material-symbols-outlined !text-[24px]">videocam</span>
           Join Interview
@@ -606,7 +606,7 @@ function DeviceCheckCard() {
             type="button"
             onClick={() => void start()}
             disabled={testing}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-night transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
           >
             <span className="material-symbols-outlined !text-[18px]">{testing ? "hourglass_top" : "play_circle"}</span>
             {testing ? "Requesting access…" : "Test camera & mic"}
@@ -871,7 +871,7 @@ function ResumeModal({
               type="button"
               onClick={upload}
               disabled={!file || phase === "uploading"}
-              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-nunito text-base font-extrabold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-nunito text-base font-extrabold text-night transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
             >
               {phase === "uploading" ? (
                 <>

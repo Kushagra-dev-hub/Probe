@@ -28,13 +28,13 @@ export default function EditInterviewPage({ params }: { params: Promise<{ interv
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
-      <Link href="/" className="text-sm text-slate-500 hover:text-slate-700">
+      <Link href="/" className="text-sm text-haze/60 hover:text-white">
         ← Back to interviews
       </Link>
-      <h1 className="mb-1 mt-4 text-2xl font-bold text-slate-900">Edit interview</h1>
-      <p className="mb-8 text-sm text-slate-500">Change the questions, schedule, or notes.</p>
-      {error && <p className="rounded-lg bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
-      {!error && !interview && <p className="text-sm text-slate-500">Loading…</p>}
+      <h1 className="mb-1 mt-4 text-2xl font-bold text-white">Edit interview</h1>
+      <p className="mb-8 text-sm text-haze/60">Change the questions, schedule, or notes.</p>
+      {error && <p className="rounded-lg bg-rose-500/10 p-4 text-sm text-rose-300 border border-rose-500/20">{error}</p>}
+      {!error && !interview && <p className="text-sm text-haze/60">Loading…</p>}
       {interview && <InterviewForm existing={interview} />}
     </main>
   );

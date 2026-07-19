@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { AuthProvider } from "@/context/auth-context";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ThemeSync } from "@/components/theme-sync";
 import "./globals.css";
 
 export const metadata = {
@@ -15,12 +14,12 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
+    <html lang="en" className="dark" suppressHydrationWarning data-scroll-behavior="smooth">
       <head>
-        {/* Blocking script: read localStorage before first paint to prevent dark-mode flash */}
+        {/* Dark-only app: pin the dark class before first paint (no toggle). */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var legacy=localStorage.getItem('practers-dark');var theme=localStorage.getItem('theme');var dark=legacy==='true'||theme==='dark';var light=legacy==='false'||theme==='light';if(dark&&!light){document.documentElement.classList.add('dark');document.documentElement.dataset.dark='true';localStorage.setItem('theme','dark');localStorage.setItem('practers-dark','true');}else if(light){document.documentElement.classList.remove('dark');document.documentElement.dataset.dark='';localStorage.setItem('theme','light');localStorage.setItem('practers-dark','false');}}catch(e){}})();`,
+            __html: `document.documentElement.classList.add('dark');document.documentElement.dataset.dark='true';try{localStorage.setItem('theme','dark');localStorage.setItem('practers-dark','true');}catch(e){}`,
           }}
         />
         <link
@@ -35,12 +34,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="antialiased dark:bg-lc-bg dark:text-[#eff1f6] overflow-x-hidden">
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange={false}
+          defaultTheme="dark"
+          forcedTheme="dark"
+          enableSystem={false}
           storageKey="theme"
         >
-          <ThemeSync />
           <AuthProvider>{children}</AuthProvider>
         </ThemeProvider>
       </body>

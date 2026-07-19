@@ -59,8 +59,8 @@ export function CookieConsent() {
         <div className="fixed bottom-6 right-6 z-[9999] pointer-events-none max-w-[430px]">
             <div className={`
                 rounded-2xl shadow-2xl pointer-events-auto
-                ${isDark 
-                    ? "bg-[#2a2a2a] border border-[#3a3a3a]" 
+                ${isDark
+                    ? "bg-grape/40 border border-steel/20"
                     : "bg-white border border-slate-200"
                 }
                 backdrop-blur-xl
@@ -95,7 +95,7 @@ export function CookieConsent() {
                         
                         <p className={`
                             text-sm mb-4 leading-relaxed
-                            ${isDark ? "text-slate-300" : "text-slate-600"}
+                            ${isDark ? "text-haze" : "text-slate-600"}
                         `}>
                             This website uses cookies and local storage for performance and personalization. 
                             Only essential cookies are turned on by default.{" "}
@@ -103,8 +103,8 @@ export function CookieConsent() {
                                 href="/login"
                                 className={`
                                     underline font-medium transition-colors
-                                    ${isDark 
-                                        ? "text-white hover:text-slate-200" 
+                                    ${isDark
+                                        ? "text-mint hover:text-mint/80"
                                         : "text-slate-700 hover:text-slate-900"
                                     }
                                 `}
@@ -120,7 +120,7 @@ export function CookieConsent() {
                                 w-full px-6 py-2.5 rounded-lg font-semibold text-sm
                                 transition-all duration-200
                                 ${isDark
-                                    ? "bg-[#1a1a1a] text-white hover:bg-[#151515] border border-[#3a3a3a]"
+                                    ? "bg-mint text-night hover:bg-primary-dark border border-transparent"
                                     : "bg-slate-900 text-white hover:bg-slate-800"
                                 }
                                 shadow-md hover:shadow-lg

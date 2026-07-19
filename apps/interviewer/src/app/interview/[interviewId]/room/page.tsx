@@ -1332,7 +1332,7 @@ function InterviewerRoom() {
                         <button type="button" onClick={() => finishInterview(false)} disabled={finishing} className="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-60 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-surface">
                             Skip &amp; go to candidates
                         </button>
-                        <button type="button" onClick={() => finishInterview(true)} disabled={finishing} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-70">
+                        <button type="button" onClick={() => finishInterview(true)} disabled={finishing} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-night transition-colors hover:bg-primary-dark disabled:cursor-wait disabled:opacity-70">
                             <span className={`material-symbols-outlined text-[18px] ${finishing ? "animate-spin" : ""}`}>{finishing ? "progress_activity" : "save"}</span>
                             {finishing ? "Saving…" : "Save & go to candidates"}
                         </button>

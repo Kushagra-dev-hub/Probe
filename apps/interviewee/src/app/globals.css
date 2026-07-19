@@ -4,16 +4,36 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --color-primary: #4A7CFF;
-  --color-primary-light: rgba(74, 124, 255, 0.1);
-  --color-primary-dark: #3a63cc;
-  --color-bg-light: #FAFBFC;
-  --color-lc-bg: #1a1a1a;
-  --color-lc-surface: #282828;
-  --color-lc-border: #3e3e3e;
-  --color-lc-hover: #333333;
-  --color-lc-input: #3a3a3a;
-  --color-lc-elevated: #303030;
+  /* ── Probe dark palette (dark-only redesign) ── */
+  --color-night: #03001C;
+  --color-grape: #301E67;
+  --color-steel: #5B8FB9;
+  --color-mint: #B6EADA;
+  --color-haze: #A9B2D0;
+
+  --color-primary: #B6EADA;
+  --color-primary-light: rgba(182, 234, 218, 0.12);
+  --color-primary-dark: #97dcc9;
+  --color-bg-light: #03001C;
+  --color-lc-bg: #03001C;
+  --color-lc-surface: #1c1140;
+  --color-lc-border: #3a2c63;
+  --color-lc-hover: #2a1a52;
+  --color-lc-input: #170e36;
+  --color-lc-elevated: #2a1a52;
+
+  /* Brand hues remapped to steel; semantic hues left default. */
+  --color-blue-300: #a9c5de;
+  --color-blue-400: #7fa8c9;
+  --color-blue-500: #5B8FB9;
+  --color-blue-600: #5B8FB9;
+  --color-blue-700: #4a7699;
+  --color-indigo-300: #a9c5de;
+  --color-indigo-400: #7fa8c9;
+  --color-indigo-500: #5B8FB9;
+  --color-indigo-600: #5B8FB9;
+  --color-indigo-700: #4a7699;
+
   --font-sans: 'Outfit', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --font-display: 'Syne', sans-serif;

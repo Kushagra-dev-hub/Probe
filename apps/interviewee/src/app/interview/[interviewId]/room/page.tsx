@@ -966,7 +966,7 @@ function CandidateRoom() {
                         <h1 className="font-nunito text-2xl font-bold text-slate-900 dark:text-white">Interview complete</h1>
                         <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">Thanks for your time. The team is reviewing your interview and you&apos;ll be notified here when there&apos;s an update.</p>
                     </div>
-                    <button type="button" onClick={() => router.push("/")} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary/90">
+                    <button type="button" onClick={() => router.push("/")} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-night shadow-sm transition-colors hover:bg-primary-dark">
                         <span className="material-symbols-outlined text-[18px]">event</span>
                         Go to my interviews
                     </button>
@@ -1003,7 +1003,7 @@ function CandidateRoom() {
                             <p className="mt-2 whitespace-pre-line">{bootstrap.candidateInstructions}</p>
                         </div>
                     )}
-                    <button type="button" disabled={joining} onClick={join} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-sm disabled:cursor-wait disabled:opacity-70">
+                    <button type="button" disabled={joining} onClick={join} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-night shadow-sm disabled:cursor-wait disabled:opacity-70">
                         <span className="material-symbols-outlined text-[18px]">sync</span>
                         {joining ? "Checking lobby..." : "Refresh lobby"}
                     </button>
@@ -1095,8 +1095,8 @@ function CandidateRoom() {
     );
 
     return (
-        <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden bg-[#0b0f17] text-white">
-            <header className="relative flex h-14 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-[#0f141d] px-4 sm:px-5">
+        <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden bg-night text-white">
+            <header className="relative flex h-14 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-grape/25 px-4 sm:px-5">
                 <div className="flex min-w-0 items-center gap-4">
                     <div className="hidden min-w-0 sm:block">
                         <p className="truncate text-[13px] font-bold text-white">Interview with {bootstrap?.interviewer.name || "Interviewer"}</p>

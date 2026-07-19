@@ -152,7 +152,7 @@ export default function SchedulePage() {
         <button
           onClick={() => setModal("new")}
           disabled={Boolean(wrongRole)}
-          className="group inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition hover:bg-primary-dark hover:shadow-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
+          className="group inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-night shadow-lg shadow-primary/25 transition hover:bg-primary-dark hover:shadow-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <span className="material-symbols-outlined text-[20px] transition-transform group-hover:rotate-90">add</span>
           New interview
@@ -248,7 +248,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
       <p className="mt-1 text-sm text-slate-500 dark:text-[#8a8a8a]">Create your first interview to generate a candidate link.</p>
       <button
         onClick={onCreate}
-        className="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-dark"
+        className="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-night transition hover:bg-primary-dark"
       >
         <span className="material-symbols-outlined text-[18px]">add</span>
         New interview
@@ -758,7 +758,7 @@ function InterviewModal({
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-night shadow-lg shadow-primary/25 transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
             {submitting ? "Saving…" : isEdit ? "Save changes" : "Create interview"}
@@ -840,7 +840,7 @@ function SuccessModal({ link, name, onClose }: { link: string; name: string; onC
               <button
                 onClick={copy}
                 className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition ${
-                  copied ? "bg-emerald-600 text-white" : "bg-primary text-white hover:bg-primary-dark"
+                  copied ? "bg-emerald-600 text-white" : "bg-primary text-night hover:bg-primary-dark"
                 }`}
               >
                 <span className="material-symbols-outlined text-[16px]">{copied ? "check" : "content_copy"}</span>

@@ -24,17 +24,17 @@ export function relativeToNow(iso: string | null): string {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  scheduled: "bg-blue-100 text-blue-700",
-  active: "bg-emerald-100 text-emerald-700",
-  interviewer_joined: "bg-amber-100 text-amber-700",
-  candidate_waiting: "bg-amber-100 text-amber-700",
-  completed: "bg-slate-200 text-slate-600",
-  cancelled: "bg-rose-100 text-rose-700",
-  no_show: "bg-rose-100 text-rose-700",
+  scheduled: "bg-steel/15 text-steel",
+  active: "bg-emerald-500/15 text-emerald-300",
+  interviewer_joined: "bg-amber-500/15 text-amber-300",
+  candidate_waiting: "bg-amber-500/15 text-amber-300",
+  completed: "bg-grape/40 text-haze",
+  cancelled: "bg-rose-500/15 text-rose-300",
+  no_show: "bg-rose-500/15 text-rose-300",
 };
 
 export function statusStyle(status: string): string {
-  return STATUS_STYLES[status] ?? "bg-slate-100 text-slate-600";
+  return STATUS_STYLES[status] ?? "bg-grape/40 text-haze";
 }
 
 export function statusLabel(status: string): string {
@@ -42,14 +42,14 @@ export function statusLabel(status: string): string {
 }
 
 const REC_STYLES: Record<string, string> = {
-  hire: "bg-emerald-100 text-emerald-700",
-  hold: "bg-amber-100 text-amber-700",
-  reject: "bg-rose-100 text-rose-700",
-  pending: "bg-slate-100 text-slate-500",
+  hire: "bg-emerald-500/15 text-emerald-300",
+  hold: "bg-amber-500/15 text-amber-300",
+  reject: "bg-rose-500/15 text-rose-300",
+  pending: "bg-grape/40 text-haze/70",
 };
 
 export function recommendationStyle(rec: string): string {
-  return REC_STYLES[rec] ?? "bg-slate-100 text-slate-500";
+  return REC_STYLES[rec] ?? "bg-grape/40 text-haze/70";
 }
 
 /** Convert an ISO string to the value a <input type="datetime-local"> expects. */
