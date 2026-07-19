@@ -114,6 +114,110 @@ function RequirementCard({ label, value, readOnly, onChange }: { label: string; 
 }
 
 /* ------------------------------------------------------------------ *
+ * DesignEvaluation — the interviewer's guide for a system-design round.
+ * Mirrors practers' solve panel: requirements, required components, key
+ * trade-offs, anti-patterns and the weighted scoring dimensions. This is the
+ * ANSWER KEY, so it renders on the interviewer side only (never the candidate).
+ * ------------------------------------------------------------------ */
+
+export type DesignMeta = {
+    functionalRequirements?: string[];
+    nonFunctionalRequirements?: string[];
+    scale?: string[];
+    requiredComponents?: string[];
+    keyTradeoffs?: string[];
+    antiPatterns?: string[];
+    scoringDimensions?: { name: string; weight: number; criteria: string }[];
+    sampleAnswer?: string;
+    followUpQuestions?: string[];
+    sampleDiagramUrl?: string | null;
+};
+
+function BulletList({ items }: { items: string[] }) {
+    return (
+        <ul className="space-y-1.5">
+            {items.map((it, i) => (
+                <li key={i} className="flex items-start gap-2 text-[13px] leading-relaxed text-slate-700 dark:text-slate-200">
+                    <span className="mt-1 flex-shrink-0 text-slate-400 dark:text-slate-500">•</span>
+                    <span>{it}</span>
+                </li>
+            ))}
+        </ul>
+    );
+}
+
+function Section({ title, icon, accent, children }: { title: string; icon: string; accent: string; children: React.ReactNode }) {
+    return (
+        <section>
+            <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                <span className={`material-symbols-outlined text-[16px] ${accent}`}>{icon}</span>
+                {title}
+            </h3>
+            {children}
+        </section>
+    );
+}
+
+export function DesignEvaluation({ meta }: { meta?: DesignMeta | null }) {
+    if (!meta) return null;
+    const fr = (meta.functionalRequirements ?? []).filter(Boolean);
+    const nfr = (meta.nonFunctionalRequirements ?? []).filter(Boolean);
+    const scale = (meta.scale ?? []).filter(Boolean);
+    const components = (meta.requiredComponents ?? []).filter(Boolean);
+    const tradeoffs = (meta.keyTradeoffs ?? []).filter(Boolean);
+    const antiPatterns = (meta.antiPatterns ?? []).filter(Boolean);
+    const scoring = (meta.scoringDimensions ?? []).filter((d) => d?.name);
+    const hasAny = fr.length || nfr.length || scale.length || components.length || tradeoffs.length || antiPatterns.length || scoring.length || meta.sampleAnswer;
+    if (!hasAny) return null;
+
+    return (
+        <div className="space-y-5">
+            <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-[12px] font-bold text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
+                <span className="material-symbols-outlined text-[16px]">shield_person</span>
+                Interviewer guide — visible only to you
+            </div>
+            {fr.length > 0 && <Section title="Functional Requirements" icon="checklist" accent="text-emerald-500"><BulletList items={fr} /></Section>}
+            {nfr.length > 0 && <Section title="Non-Functional Requirements" icon="tune" accent="text-sky-500"><BulletList items={nfr} /></Section>}
+            {scale.length > 0 && <Section title="Scale" icon="trending_up" accent="text-violet-500"><BulletList items={scale} /></Section>}
+            {components.length > 0 && <Section title="Required Components" icon="widgets" accent="text-blue-500"><BulletList items={components} /></Section>}
+            {tradeoffs.length > 0 && <Section title="Key Trade-offs to Probe" icon="balance" accent="text-amber-500"><BulletList items={tradeoffs} /></Section>}
+            {antiPatterns.length > 0 && (
+                <Section title="Anti-Patterns to Watch For" icon="warning" accent="text-rose-500">
+                    <ul className="space-y-1.5">
+                        {antiPatterns.map((it, i) => (
+                            <li key={i} className="flex items-start gap-2 rounded-lg bg-rose-50 px-2.5 py-1.5 text-[13px] leading-relaxed text-rose-800 dark:bg-rose-500/10 dark:text-rose-300">
+                                <span className="material-symbols-outlined mt-0.5 flex-shrink-0 text-[15px]">block</span>
+                                <span>{it}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </Section>
+            )}
+            {scoring.length > 0 && (
+                <Section title="How You're Evaluating" icon="scoreboard" accent="text-indigo-500">
+                    <div className="space-y-2.5">
+                        {scoring.map((d, i) => (
+                            <div key={i} className="flex items-start gap-3">
+                                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-[11px] font-bold text-white shadow-sm">{d.weight}%</div>
+                                <div className="min-w-0 pt-0.5">
+                                    <div className="text-[14px] font-semibold text-slate-900 dark:text-white">{d.name}</div>
+                                    <div className="mt-0.5 text-[12.5px] leading-relaxed text-slate-600 dark:text-slate-400">{d.criteria}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </Section>
+            )}
+            {meta.sampleAnswer && (
+                <Section title="Sample Approach" icon="lightbulb" accent="text-teal-500">
+                    <p className="whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-3 text-[13px] leading-relaxed text-slate-700 dark:border-lc-border dark:bg-lc-bg dark:text-slate-200">{meta.sampleAnswer}</p>
+                </Section>
+            )}
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ *
  * DesignExtras — Follow-up questions + revealable hints (problem panel).
  * ------------------------------------------------------------------ */
 

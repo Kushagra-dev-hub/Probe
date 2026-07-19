@@ -982,6 +982,9 @@ io.on("connection", (socket) => {
         });
         // Postgres seed/bank question: sampleTests live on the Question table
         // (questionId is a non-hex uuid/slug). Look it up separately — no FK relation.
+        // Run = sample cases only (fast feedback). Submit = sample + hidden cases
+        // (the full graded set, practers-style).
+        const includeHidden = mode === "submit";
         if (questionRow?.questionId && !/^[0-9a-f]{24}$/i.test(questionRow.questionId)) {
           const pgQuestion = await prisma.question.findUnique({ where: { id: questionRow.questionId }, select: { sampleTests: true } });
           sampleTests = extractSampleTests(pgQuestion?.sampleTests);
@@ -990,6 +993,7 @@ io.on("connection", (socket) => {
           const bankQuestion = await getBankQuestion(questionRow.questionId);
           if (bankQuestion) {
             sampleTests = extractSampleTests(bankQuestion.sample_tests);
+            if (includeHidden) sampleTests = sampleTests.concat(extractSampleTests(bankQuestion.hidden_tests));
             wrapper = bankQuestion.wrappers[p.language] ?? bankQuestion.wrappers[p.language === "python" ? "python3" : p.language] ?? null;
             if (bankQuestion.sqlMeta) sqlMeta = { wrapperCode: bankQuestion.sqlMeta.wrapperCode };
             const sol = bankQuestion.solution;

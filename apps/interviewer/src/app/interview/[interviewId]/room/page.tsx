@@ -14,7 +14,7 @@ import { useAuth } from "@/context/auth-context";
 import { useInterviewRoom } from "@/hooks/use-interview-room";
 import { api } from "@/lib/api";
 import { CopilotDock, ResumePdf, ScorecardView } from "@/components/copilot";
-import { DesignBoard, DesignExtras } from "@/components/design-board";
+import { DesignBoard, DesignExtras, DesignEvaluation } from "@/components/design-board";
 import { SqlSchema, SqlResultView } from "@/components/sql-view";
 import { SolutionView } from "@/components/solution-view";
 import { SpeechCapture } from "@/components/speech-capture";
@@ -645,8 +645,18 @@ function InterviewerRoom() {
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const activeQuestion = useMemo(() => {
         if (!questions.length) return null;
-        return questions.find((question) => question.id === activeQuestionId) || questions[serverActiveQuestionIndex] || questions[0];
-    }, [activeQuestionId, questions, serverActiveQuestionIndex]);
+        const surface: RoomSurface = surfaceState?.surface ?? bootstrap?.activeSurface ?? "meet";
+        // On the Meet view keep whatever question is selected. On a coding surface only
+        // ever surface a question that belongs to it — never fall back to a wrong-surface
+        // question, which is what let a design/DSA question (and its synced editor
+        // contents) bleed into the SQL/DSA panels. No matching question → null (empty state).
+        if (surface === "meet") {
+            return questions.find((question) => question.id === activeQuestionId) || questions[serverActiveQuestionIndex] || questions[0];
+        }
+        const byActiveId = questions.find((question) => question.id === activeQuestionId);
+        if (byActiveId && questionSurface(byActiveId) === surface) return byActiveId;
+        return questions.find((question) => questionSurface(question) === surface) || null;
+    }, [activeQuestionId, questions, serverActiveQuestionIndex, surfaceState?.surface, bootstrap?.activeSurface]);
     const totalSeconds = timerState?.totalSeconds || (bootstrap?.durationMinutes || 60) * 60;
     const remainingSeconds = Math.max(0, totalSeconds - elapsedSeconds);
     // Running clock — elapsed time since the candidate was admitted (interview started).
@@ -663,13 +673,13 @@ function InterviewerRoom() {
     const questionCacheKey = `${bootstrap?.directInterviewId || ""}:${questionLookupId || ""}`;
     const testCasesToDisplay = questionDetails?.sample_tests || [];
     const activeEditorState = useMemo(() => {
-        if (!editorState) return null;
-        if (activeQuestion?.id && editorState.questionId !== activeQuestion.id) return null;
+        if (!editorState || !activeQuestion?.id) return null;
+        if (editorState.questionId !== activeQuestion.id) return null;
         return editorState;
     }, [activeQuestion?.id, editorState]);
     const activeExecutionState = useMemo(() => {
-        if (!executionState) return null;
-        if (activeQuestion?.id && executionState.questionId !== activeQuestion.id) return null;
+        if (!executionState || !activeQuestion?.id) return null;
+        if (executionState.questionId !== activeQuestion.id) return null;
         return executionState;
     }, [activeQuestion?.id, executionState]);
     const executionRunning = activeExecutionState?.phase === "running";
@@ -1512,7 +1522,10 @@ function InterviewerRoom() {
                                                     <SqlSchema examples={questionDetails.examples as any} />
                                                 )}
                                                 {activeSurface === "design" && (
-                                                    <DesignExtras followUps={(questionDetails as any)?.designMeta?.followUpQuestions} hints={questionDetails.hints} />
+                                                    <>
+                                                        <DesignEvaluation meta={(questionDetails as any)?.designMeta} />
+                                                        <DesignExtras followUps={(questionDetails as any)?.designMeta?.followUpQuestions} hints={questionDetails.hints} />
+                                                    </>
                                                 )}
                                             </>
                                         ) : (
@@ -1583,7 +1596,7 @@ function InterviewerRoom() {
 
                         <section className="flex min-w-0 flex-1 flex-col overflow-hidden border-l border-slate-200 bg-white dark:border-lc-border dark:bg-lc-surface">
                             <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 dark:border-lc-border">
-                                {activeSurface !== "design" && (
+                                {activeSurface === "dsa" ? (
                                     <select
                                         value={language}
                                         onChange={(event) => updateLanguage(event.target.value)}
@@ -1593,6 +1606,8 @@ function InterviewerRoom() {
                                     >
                                         {EDITOR_LANGUAGES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
+                                ) : (
+                                    <span className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 px-2.5 py-1 text-[12px] font-bold uppercase text-slate-600 dark:border-lc-border dark:bg-lc-bg dark:text-slate-200">{activeSurface === "sql" ? "SQL" : <><span className="material-symbols-outlined text-[15px]">design_services</span>System Design</>}</span>
                                 )}
                                 <div className="ml-auto flex items-center gap-2">
                                     {isCodingSurface && (
@@ -1635,7 +1650,13 @@ function InterviewerRoom() {
                             </div>
 
                             <div className="min-h-0 flex-1">
-                                {activeSurface === "design" ? (
+                                {!activeQuestion ? (
+                                    <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+                                        <span className="material-symbols-outlined text-[36px] text-slate-300 dark:text-slate-600">quiz</span>
+                                        <p className="text-sm font-bold text-slate-600 dark:text-slate-300">No {activeSurface === "sql" ? "SQL" : activeSurface === "design" ? "System Design" : "DSA"} question in this interview</p>
+                                        <p className="text-xs text-slate-400">This round has no attached question. Open a different round or edit the interview to add one.</p>
+                                    </div>
+                                ) : activeSurface === "design" ? (
                                     <DesignBoard value={code} readOnly onChange={undefined} theme="light" />
                                 ) : (
                                     <MonacoEditor

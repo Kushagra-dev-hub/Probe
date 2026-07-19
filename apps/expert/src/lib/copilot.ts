@@ -48,6 +48,12 @@ type QuestionContext = {
   difficulty: string | null;
   /** Reference solution code, keyed by normalized language (interviewer-only grounding). */
   solutionByLang: Record<string, string>;
+  /** System-design grading rubric (interviewer-only) — required components, trade-offs, anti-patterns. */
+  designRubric: {
+    requiredComponents: string[];
+    keyTradeoffs: string[];
+    antiPatterns: string[];
+  } | null;
 };
 
 /** Normalize a language key + extract the optimal/reference solution code per language. */
@@ -257,6 +263,7 @@ async function loadQuestionContext(interviewId: string, questionRowId: string | 
   let constraintsText = "";
   let difficulty = row.difficulty;
   let solutionByLang: Record<string, string> = {};
+  let designRubric: QuestionContext["designRubric"] = null;
   if (row.questionId && /^[0-9a-f]{24}$/i.test(row.questionId)) {
     const bank = await getBankQuestion(row.questionId).catch(() => null);
     if (bank) {
@@ -265,6 +272,13 @@ async function loadQuestionContext(interviewId: string, questionRowId: string | 
       constraintsText = (bank.constraints ?? []).join("; ");
       difficulty = bank.difficulty || difficulty;
       solutionByLang = extractSolutionByLang(bank.solution);
+      if (bank.designMeta) {
+        designRubric = {
+          requiredComponents: bank.designMeta.requiredComponents ?? [],
+          keyTradeoffs: bank.designMeta.keyTradeoffs ?? [],
+          antiPatterns: bank.designMeta.antiPatterns ?? [],
+        };
+      }
     }
   } else if (row.questionId) {
     const bank = await prisma.question.findUnique({ where: { id: row.questionId } }).catch(() => null);
@@ -277,7 +291,7 @@ async function loadQuestionContext(interviewId: string, questionRowId: string | 
       solutionByLang = extractSolutionByLang(bank.solution);
     }
   }
-  return { id: row.id, bankQuestionId: row.questionId, title, statement, constraints: constraintsText, difficulty, solutionByLang };
+  return { id: row.id, bankQuestionId: row.questionId, title, statement, constraints: constraintsText, difficulty, solutionByLang, designRubric };
 }
 
 export async function ensureCopilotRuntime(interviewId: string): Promise<CopilotRuntime | null> {
@@ -582,6 +596,19 @@ export async function analyze(interviewId: string, trigger: CopilotTrigger): Pro
         const key = codeLang === "python3" ? "python" : codeLang === "js" ? "javascript" : (codeLang || "python");
         const ref = byLang[key] || byLang.python || Object.values(byLang)[0];
         return ref ? `REFERENCE SOLUTION (optimal, ${key}) — for YOUR comparison only, NEVER reveal it to the candidate:\n${ref.slice(0, 3000)}` : "";
+      })(),
+      // System-design grading key — grounds design suggestions in what a strong answer
+      // must cover and the traps to catch. Interviewer-only; never reveal to the candidate.
+      (() => {
+        if (surface !== "design") return "";
+        const r = runtime.question?.designRubric;
+        if (!r) return "";
+        const parts = [
+          r.requiredComponents.length ? `Required components: ${r.requiredComponents.join("; ")}` : "",
+          r.keyTradeoffs.length ? `Key trade-offs to probe: ${r.keyTradeoffs.join("; ")}` : "",
+          r.antiPatterns.length ? `Anti-patterns to catch: ${r.antiPatterns.join("; ")}` : "",
+        ].filter(Boolean);
+        return parts.length ? `DESIGN GRADING KEY (for YOUR comparison only, NEVER reveal it to the candidate):\n${parts.join("\n")}` : "";
       })(),
       runtime.executions.length
         ? `RECENT RUNS (newest last):\n${runtime.executions.map((e) => `- [${e.at}] ${e.summary}`).join("\n")}`
