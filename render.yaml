@@ -2,7 +2,7 @@ services:
   - type: web
     name: probe-expert
     runtime: node
-    plan: starter
+    plan: free
     region: oregon
     branch: main
     rootDir: .

@@ -45,7 +45,7 @@ If you'd rather create the service by hand instead of via Blueprint: **New → W
 - **Build Command:** `npm ci && npm run build:expert`
 - **Start Command:** `npm run start --workspace @probe/expert`
 - **Health Check Path:** `/health`
-- **Plan:** at least **Starter** — the free tier spins down on idle, which drops live Socket.IO connections mid-interview. Don't use it for anything but a throwaway test.
+- **Plan:** `render.yaml` currently sets **Free** (no card required) — fine for wiring things up and poking at the deploy, but it spins down after ~15 min idle, which drops any live Socket.IO connection mid-interview and adds a cold-start delay on the next request. Bump `plan: free` to `plan: starter` in `render.yaml` (~$7/mo, needs a payment method on the Render account) before using this for a real interview.
 
 ### 1.2 Environment variables
 
@@ -155,5 +155,5 @@ Save — Render redeploys automatically on env var changes. This is what makes `
 - **Auth is dev-token unless you set the Supabase env vars.** Without `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` on Render, the expert service accepts any string as a raw user id — fine for a demo, not for a real public deployment. This was already flagged as unfinished in the project's own status notes (real Supabase login was never wired into the frontends), not something introduced by this deploy.
 - **Resume uploads are ephemeral on Render.** They're written to a local `uploads/` folder (`apps/expert/src/index.ts`), which does not persist across redeploys/restarts on Render's default filesystem. Attach a Render Disk mounted at `apps/expert/uploads` if this needs to survive, or move it to object storage later.
 - **Preview deployments won't have working CORS.** Vercel preview URLs are random per-deploy; the CORS allowlist above only covers the two production URLs. Fine for production, expect preview deploys of the room to fail CORS until you either add their origin manually or accept previews are for UI-only checks.
-- **Free-tier Render spins down on idle** — don't use it for this app; an in-progress interview would drop its socket connection mid-session on a cold start.
+- **`render.yaml` currently uses Render's free plan, which spins down on idle** — an in-progress interview would drop its socket connection mid-session on a cold start, and the first request after idle takes longer while it wakes up. Switch `plan: free` → `plan: starter` in `render.yaml` (requires a payment method on the Render account) before relying on this for a real interview.
 - **Cross-network video may need a TURN server.** The default `NEXT_PUBLIC_ICE_SERVERS` is Google's public STUN only, which fails behind some NATs/corporate firewalls. Add a TURN server to that JSON array on both Vercel projects if you hit connection issues between real remote participants.
