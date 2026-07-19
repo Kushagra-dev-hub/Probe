@@ -287,8 +287,8 @@ function FeatureGrid() {
   const items = [
     { img: "/interview_lineart.png", pos: "object-center", title: "Live coding room", desc: "HD video, screen share, and a shared code editor — the whole interview happens in one collaborative room." },
     { img: "/practice_lineart.png", pos: "object-center", title: "Real code execution", desc: "Run the candidate's solution against real test cases in 40+ languages, right inside the room." },
-    { img: "/blog1.png", pos: "object-center", title: "AI code intelligence", desc: "The copilot reads code edits as they happen and flags logical gaps, complexity issues, and missed edge cases." },
-    { img: "/blog2.png", pos: "object-center", title: "Ask-this-next", desc: "Grounded, line-cited follow-up questions delivered privately to the interviewer at the right moment." },
+    { img: "/ai_intelligence_lineart.png", pos: "object-center", title: "AI code intelligence", desc: "The copilot reads code edits as they happen and flags logical gaps, complexity issues, and missed edge cases." },
+    { img: "/ask_next_lineart.png", pos: "object-center", title: "Ask-this-next", desc: "Grounded, line-cited follow-up questions delivered privately to the interviewer at the right moment." },
     { img: "/linkedin_lineart.png", pos: "object-center", title: "Role-based rubrics", desc: "Paste any job description and get objective, weighted evaluation criteria tailored to the role." },
     { img: "/analytics_lineart.png", pos: "object-[50%_60%]", title: "Evidence scorecards", desc: "Auto-drafted evaluations that cite exact code lines, so your hire/no-hire call is backed by proof." },
   ];
@@ -339,6 +339,8 @@ export default function LandingPage() {
   const mainRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { user } = useAuth();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoPlaying, setVideoPlaying] = useState(true);
 
   const goNew = () => router.push("/later");
 
@@ -348,6 +350,13 @@ export default function LandingPage() {
       const y = target.getBoundingClientRect().top + window.scrollY - 64;
       window.scrollTo({ top: y, behavior: "smooth" });
     }
+  };
+
+  const toggleVideo = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) void video.play();
+    else video.pause();
   };
 
   useGSAP(
@@ -525,29 +534,6 @@ export default function LandingPage() {
 
             {/* large media panel */}
             <div className="hero-preview relative mx-auto mt-10 max-w-[980px]">
-              {/* floating accent card — left */}
-              <div className="absolute -left-4 top-20 z-20 hidden w-44 -rotate-6 rounded-2xl border border-steel/20 bg-grape/80 p-3 shadow-2xl backdrop-blur-xl lg:block xl:-left-10">
-                <div className="flex items-center gap-2">
-                  <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-steel to-mint text-[10px] font-bold text-night">A</span>
-                  <div className="leading-tight">
-                    <p className="text-[11px] font-bold text-white">Candidate</p>
-                    <p className="text-[9px] text-mint">screen sharing</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* floating accent card — right (NEW! sticker) */}
-              <div className="absolute -right-4 top-10 z-20 hidden w-52 rotate-6 rounded-2xl border border-mint/25 bg-grape/80 p-3 shadow-2xl backdrop-blur-xl lg:block xl:-right-10">
-                <span className="absolute -right-2 -top-3 rotate-12 rounded-full bg-mint px-2 py-0.5 text-[10px] font-black text-night shadow-lg">NEW!</span>
-                <div className="mb-1 flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[14px] text-mint">auto_awesome</span>
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-mint">Ask this next</span>
-                </div>
-                <p className="text-[10.5px] font-semibold leading-snug text-white">
-                  &ldquo;How does this handle duplicate values?&rdquo;
-                </p>
-              </div>
-
               {/* gradient-ring media */}
               <div className="rounded-[28px] bg-gradient-to-br from-steel/60 via-mint/40 to-steel/50 p-[1.5px] shadow-[0_45px_120px_-45px_rgba(0,0,0,0.95)]">
                 <div className="relative overflow-hidden rounded-[27px] bg-night">
@@ -558,51 +544,41 @@ export default function LandingPage() {
                     <span className="h-3 w-3 rounded-full bg-mint" />
                   </div>
 
-                  {/* body: video stage + editor */}
-                  <div className="grid h-[280px] grid-cols-12 md:h-[420px]">
-                    <div className="col-span-5 flex flex-col gap-3 border-r border-white/5 bg-black/40 p-4">
-                      {[
-                        { n: "Candidate", t: "from-steel to-mint", i: "A" },
-                        { n: "You", t: "from-mint to-steel", i: "Y" },
-                      ].map((v) => (
-                        <div key={v.n} className="relative flex-1 overflow-hidden rounded-xl border border-white/5 bg-grape/25">
-                          <div className="grid h-full place-items-center">
-                            <span className={`grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br ${v.t} text-lg font-bold text-night`}>{v.i}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="col-span-7 space-y-1 bg-black/50 p-4 font-mono text-[11px] leading-relaxed md:text-[12px]">
-                      <div className="text-steel/60"># two_sum — O(n)</div>
-                      <div><span className="text-mint">def</span> <span className="text-steel">two_sum</span>(nums, target):</div>
-                      <div className="pl-4 text-haze/85">seen = {"{}"}</div>
-                      <div className="pl-4"><span className="text-mint">for</span> i, n <span className="text-mint">in</span> enumerate(nums):</div>
-                      <div className="pl-8 text-haze/85">diff = target - n</div>
-                      <div className="pl-8"><span className="text-mint">if</span> diff <span className="text-mint">in</span> seen:</div>
-                      <div className="pl-12 text-haze/85"><span className="text-mint">return</span> [seen[diff], i]</div>
-                      <div className="pl-8 text-haze/85">seen[n] = i</div>
-                    </div>
-                  </div>
+                  {/* body: always-playing demo video, click to pause/resume.
+                      aspect-video + object-contain so the full frame always shows, never cropped. */}
+                  <div className="relative aspect-video cursor-pointer bg-black" onClick={toggleVideo}>
+                    <video
+                      ref={videoRef}
+                      src="/DemoVideo.mp4"
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      onPlay={() => setVideoPlaying(true)}
+                      onPause={() => setVideoPlaying(false)}
+                      className="h-full w-full object-contain"
+                    />
 
-                  {/* dim + play overlay */}
-                  <div className="absolute inset-0 grid place-items-center bg-night/40">
-                    <button
-                      onClick={() => scrollTo("#features")}
-                      className="group relative grid h-24 w-24 place-items-center"
-                      aria-label="Watch the demo"
+                    {/* dim + play overlay — only shown while paused */}
+                    <div
+                      className={`absolute inset-0 grid place-items-center bg-night/40 transition-opacity duration-300 ${
+                        videoPlaying ? "pointer-events-none opacity-0" : "opacity-100"
+                      }`}
                     >
-                      <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full animate-[spin_16s_linear_infinite]">
-                        <defs>
-                          <path id="watchRing" d="M50,50 m-37,0 a37,37 0 1,1 74,0 a37,37 0 1,1 -74,0" />
-                        </defs>
-                        <text className="fill-mint/80 text-[10px] font-bold uppercase tracking-[0.28em]">
-                          <textPath href="#watchRing">Watch the demo &middot; Watch the demo &middot; </textPath>
-                        </text>
-                      </svg>
-                      <span className="grid h-16 w-16 place-items-center rounded-full bg-mint text-night shadow-[0_0_40px_-6px_rgba(182,234,218,0.7)] transition-transform duration-300 group-hover:scale-110">
-                        <span className="material-symbols-outlined text-[30px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+                      <span className="group relative grid h-24 w-24 place-items-center" aria-label="Play the demo">
+                        <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full animate-[spin_16s_linear_infinite]">
+                          <defs>
+                            <path id="watchRing" d="M50,50 m-37,0 a37,37 0 1,1 74,0 a37,37 0 1,1 -74,0" />
+                          </defs>
+                          <text className="fill-mint/80 text-[10px] font-bold uppercase tracking-[0.28em]">
+                            <textPath href="#watchRing">Watch the demo &middot; Watch the demo &middot; </textPath>
+                          </text>
+                        </svg>
+                        <span className="grid h-16 w-16 place-items-center rounded-full bg-mint text-night shadow-[0_0_40px_-6px_rgba(182,234,218,0.7)] transition-transform duration-300 group-hover:scale-110">
+                          <span className="material-symbols-outlined text-[30px]" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+                        </span>
                       </span>
-                    </button>
+                    </div>
                   </div>
                 </div>
               </div>
