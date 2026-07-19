@@ -46,7 +46,31 @@ type QuestionContext = {
   statement: string;
   constraints: string;
   difficulty: string | null;
+  /** Reference solution code, keyed by normalized language (interviewer-only grounding). */
+  solutionByLang: Record<string, string>;
 };
+
+/** Normalize a language key + extract the optimal/reference solution code per language. */
+function extractSolutionByLang(solution: unknown): Record<string, string> {
+  const norm = (l: string) => {
+    const v = l.trim().toLowerCase();
+    if (["python", "python3", "py"].includes(v)) return "python";
+    if (["javascript", "js", "node", "nodejs"].includes(v)) return "javascript";
+    if (["cpp", "c++", "cxx"].includes(v)) return "cpp";
+    return v;
+  };
+  if (!solution || typeof solution !== "object") return {};
+  const s = solution as Record<string, unknown>;
+  const approach = (s.optimized || s.optimal || s.optimalApproach || s.bruteForce || s.brute_force || s) as Record<string, unknown>;
+  const codeRaw = (approach?.code || approach) as unknown;
+  const out: Record<string, string> = {};
+  if (codeRaw && typeof codeRaw === "object") {
+    for (const [lang, code] of Object.entries(codeRaw as Record<string, unknown>)) {
+      if (typeof code === "string" && code.trim()) out[norm(lang)] = code;
+    }
+  }
+  return out;
+}
 
 type SpeechTurn = {
   speaker: "interviewer" | "interviewee";
@@ -232,6 +256,7 @@ async function loadQuestionContext(interviewId: string, questionRowId: string | 
   let statement = row.text;
   let constraintsText = "";
   let difficulty = row.difficulty;
+  let solutionByLang: Record<string, string> = {};
   if (row.questionId && /^[0-9a-f]{24}$/i.test(row.questionId)) {
     const bank = await getBankQuestion(row.questionId).catch(() => null);
     if (bank) {
@@ -239,6 +264,7 @@ async function loadQuestionContext(interviewId: string, questionRowId: string | 
       statement = bank.statement || bank.description || statement;
       constraintsText = (bank.constraints ?? []).join("; ");
       difficulty = bank.difficulty || difficulty;
+      solutionByLang = extractSolutionByLang(bank.solution);
     }
   } else if (row.questionId) {
     const bank = await prisma.question.findUnique({ where: { id: row.questionId } }).catch(() => null);
@@ -248,9 +274,10 @@ async function loadQuestionContext(interviewId: string, questionRowId: string | 
       statement = bank.statement || bank.description || statement;
       constraintsText = Array.isArray(constraints) ? constraints.map(String).join("; ") : constraints ? String(constraints) : "";
       difficulty = bank.difficulty || difficulty;
+      solutionByLang = extractSolutionByLang(bank.solution);
     }
   }
-  return { id: row.id, bankQuestionId: row.questionId, title, statement, constraints: constraintsText, difficulty };
+  return { id: row.id, bankQuestionId: row.questionId, title, statement, constraints: constraintsText, difficulty, solutionByLang };
 }
 
 export async function ensureCopilotRuntime(interviewId: string): Promise<CopilotRuntime | null> {
@@ -546,6 +573,16 @@ export async function analyze(interviewId: string, trigger: CopilotTrigger): Pro
         ? `ACTIVE QUESTION: ${runtime.question.title}${runtime.question.difficulty ? ` (${runtime.question.difficulty})` : ""}\n${runtime.question.statement.slice(0, 2000)}${runtime.question.constraints ? `\nConstraints: ${runtime.question.constraints}` : ""}`
         : "ACTIVE QUESTION: (not shared yet)",
       workBlock,
+      // Reference solution in the SAME language the candidate is coding — lets the
+      // copilot compare the candidate's approach to the optimal one. Interviewer-only;
+      // the copilot must never reveal it to the candidate.
+      (() => {
+        if (surface !== "dsa" && surface !== "meet") return "";
+        const byLang = runtime.question?.solutionByLang ?? {};
+        const key = codeLang === "python3" ? "python" : codeLang === "js" ? "javascript" : (codeLang || "python");
+        const ref = byLang[key] || byLang.python || Object.values(byLang)[0];
+        return ref ? `REFERENCE SOLUTION (optimal, ${key}) — for YOUR comparison only, NEVER reveal it to the candidate:\n${ref.slice(0, 3000)}` : "";
+      })(),
       runtime.executions.length
         ? `RECENT RUNS (newest last):\n${runtime.executions.map((e) => `- [${e.at}] ${e.summary}`).join("\n")}`
         : "RECENT RUNS: none — the candidate has not run the code yet.",

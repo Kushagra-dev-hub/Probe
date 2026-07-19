@@ -16,6 +16,7 @@ import { api } from "@/lib/api";
 import { CopilotDock, ResumePdf, ScorecardView } from "@/components/copilot";
 import { DesignBoard, DesignExtras } from "@/components/design-board";
 import { SqlSchema, SqlResultView } from "@/components/sql-view";
+import { SolutionView } from "@/components/solution-view";
 import { SpeechCapture } from "@/components/speech-capture";
 import type { CopilotInsight, CopilotScorecard, CopilotSuggestion, InterviewRubric, ResumeAnalysis, RoomSurface } from "@probe/contract";
 
@@ -138,6 +139,15 @@ function formatDuration(totalSeconds: number) {
     const minutes = Math.floor(safe / 60);
     const seconds = safe % 60;
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+/** HH:MM:SS elapsed clock. */
+function formatElapsed(totalSeconds: number) {
+    const s = Math.max(0, Math.floor(totalSeconds));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 }
 
 function difficultyTagClass(difficulty?: string | null) {
@@ -639,6 +649,15 @@ function InterviewerRoom() {
     }, [activeQuestionId, questions, serverActiveQuestionIndex]);
     const totalSeconds = timerState?.totalSeconds || (bootstrap?.durationMinutes || 60) * 60;
     const remainingSeconds = Math.max(0, totalSeconds - elapsedSeconds);
+    // Running clock — elapsed time since the candidate was admitted (interview started).
+    const admittedAt = roomState?.candidateAdmittedAt || bootstrap?.candidateAdmittedAt || null;
+    const [nowTs, setNowTs] = useState(() => Date.now());
+    useEffect(() => {
+        if (!admittedAt || sessionEnded) return;
+        const id = window.setInterval(() => setNowTs(Date.now()), 1000);
+        return () => window.clearInterval(id);
+    }, [admittedAt, sessionEnded]);
+    const runningElapsed = admittedAt ? Math.max(0, Math.floor((nowTs - new Date(admittedAt).getTime()) / 1000)) : 0;
     const progressPct = Math.min(100, Math.round((elapsedSeconds / Math.max(1, totalSeconds)) * 100));
     const questionLookupId = getQuestionLookupId(activeQuestion);
     const questionCacheKey = `${bootstrap?.directInterviewId || ""}:${questionLookupId || ""}`;
@@ -1341,19 +1360,22 @@ function InterviewerRoom() {
                 </div>
             )}
             <div className="flex h-full flex-col">
-                <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 dark:border-lc-border dark:bg-lc-surface sm:px-5">
+                <header className="relative flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 dark:border-lc-border dark:bg-lc-surface sm:px-5">
                     <div className="flex min-w-0 items-center gap-4">
                         <button type="button" onClick={() => router.back()} className="flex size-8 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition-colors hover:bg-slate-100 dark:border-lc-border dark:text-slate-200 dark:hover:bg-lc-border" title="Back">
                             <span className="material-symbols-outlined text-[17px]">arrow_back</span>
                         </button>
-                        <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                            <span className="material-symbols-outlined text-[17px]">schedule</span>
-                            <span className="font-mono text-[13px] font-bold tabular-nums">{formatDuration(remainingSeconds)}</span>
-                        </div>
                         <div className="hidden min-w-0 sm:block">
                             <p className="truncate text-[13px] font-bold text-slate-900 dark:text-white">{bootstrap?.candidate.name || "Candidate"}</p>
                             <p className="truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">{formatDateTime(bootstrap?.scheduledAt)}</p>
                         </div>
+                    </div>
+
+                    {/* Running interview timer — centered, red, HH:MM:SS since admit. */}
+                    <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2">
+                        <span className={`material-symbols-outlined text-[19px] ${admitted ? "text-red-500" : "text-slate-400"}`}>timer</span>
+                        <span className={`font-mono text-[17px] font-black tabular-nums ${admitted ? "text-red-500" : "text-slate-400"}`}>{admitted ? formatElapsed(runningElapsed) : "00:00:00"}</span>
+                        {admitted && <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-red-400 opacity-75" /><span className="relative inline-flex size-2 rounded-full bg-red-500" /></span>}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -1551,47 +1573,9 @@ function InterviewerRoom() {
                                     </div>
                                 )}
 
-                                {leftTab === "solution" && (() => {
-                                    const solution = questionDetails?.solution;
-                                    const approaches = normalizeSolutionApproaches(solution);
-                                    if (!approaches.length) return <div className="text-sm italic text-slate-500">No solution available for this question.</div>;
-
-                                    return (
-                                        <div className="space-y-3">
-                                            {approaches.map(({ key, title, approach }) => {
-                                                const explanation = cleanExplainationText(approach.explaination || approach.description || approach.explanation || approach.summary || approach.content || "");
-                                                const codeMap = normalizeSolutionCode(approach);
-                                                const codeLangs = getSolutionCodeLanguages(codeMap);
-                                                const selectedLang = codeLangs.find((item) => normalizeStarterLanguageKey(item) === normalizeStarterLanguageKey(language)) || codeLangs[0];
-                                                const codeText = selectedLang ? codeMap[selectedLang] : "";
-                                                const time = normalizeComplexityValue(approach.timeComplexity);
-                                                const space = normalizeComplexityValue(approach.spaceComplexity);
-
-                                                return (
-                                                    <div key={key} className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-lc-border dark:bg-lc-bg">
-                                                        <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 dark:border-lc-border dark:bg-[#222] dark:text-white">{title}</div>
-                                                        <div className="space-y-4 p-4">
-                                                            {explanation && (
-                                                                <div className="prose prose-sm max-w-none dark:prose-invert">
-                                                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, rehypeSanitize, [rehypeKatex, { strict: false, throwOnError: false }]] as any}>
-                                                                        {normalizeQuestionMarkdown(explanation)}
-                                                                    </ReactMarkdown>
-                                                                </div>
-                                                            )}
-                                                            {(time || space) && (
-                                                                <div className="grid grid-cols-2 gap-3">
-                                                                    {time && <div className="rounded-lg bg-slate-50 p-3 dark:bg-[#1e1e1e]"><p className="text-[11px] font-bold uppercase text-slate-500">Time</p><p className="mt-1 font-mono text-sm text-slate-700 dark:text-slate-200">{time}</p></div>}
-                                                                    {space && <div className="rounded-lg bg-slate-50 p-3 dark:bg-[#1e1e1e]"><p className="text-[11px] font-bold uppercase text-slate-500">Space</p><p className="mt-1 font-mono text-sm text-slate-700 dark:text-slate-200">{space}</p></div>}
-                                                                </div>
-                                                            )}
-                                                            {codeText && <pre className="custom-scrollbar overflow-auto rounded-lg bg-slate-950 p-4 font-mono text-[13px] text-slate-100">{codeText}</pre>}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    );
-                                })()}
+                                {leftTab === "solution" && (
+                                    <SolutionView solution={questionDetails?.solution} preferredLanguage={language} />
+                                )}
                             </div>
                         </aside>
 

@@ -68,6 +68,15 @@ function formatDuration(totalSeconds: number) {
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+/** HH:MM:SS elapsed clock. */
+function formatElapsed(totalSeconds: number) {
+    const s = Math.max(0, Math.floor(totalSeconds));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+}
+
 function initials(name?: string | null) {
     return (name || "")
         .split(/\s+/)
@@ -438,6 +447,15 @@ function CandidateRoom() {
     const testCasesToDisplay = questionDetails?.sample_tests || [];
     const totalSeconds = timerState?.totalSeconds || (bootstrap?.durationMinutes || 60) * 60;
     const remainingSeconds = Math.max(0, totalSeconds - elapsedSeconds);
+    // Running clock — elapsed time since the candidate was admitted.
+    const admittedAt = roomState?.candidateAdmittedAt || bootstrap?.candidateAdmittedAt || null;
+    const [nowTs, setNowTs] = useState(() => Date.now());
+    useEffect(() => {
+        if (!admittedAt || sessionEnded) return;
+        const id = window.setInterval(() => setNowTs(Date.now()), 1000);
+        return () => window.clearInterval(id);
+    }, [admittedAt, sessionEnded]);
+    const runningElapsed = admittedAt ? Math.max(0, Math.floor((nowTs - new Date(admittedAt).getTime()) / 1000)) : 0;
     const activeEditorState = useMemo(() => {
         if (!editorState) return null;
         if (activeQuestion?.id && editorState.questionId !== activeQuestion.id) return null;
@@ -1078,16 +1096,19 @@ function CandidateRoom() {
 
     return (
         <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden bg-[#0b0f17] text-white">
-            <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-[#0f141d] px-4 sm:px-5">
+            <header className="relative flex h-14 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-[#0f141d] px-4 sm:px-5">
                 <div className="flex min-w-0 items-center gap-4">
-                    <div className="flex items-center gap-1.5 text-emerald-400">
-                        <span className="material-symbols-outlined text-[17px]">schedule</span>
-                        <span className="font-mono text-[13px] font-bold tabular-nums">{formatDuration(remainingSeconds)}</span>
-                    </div>
                     <div className="hidden min-w-0 sm:block">
                         <p className="truncate text-[13px] font-bold text-white">Interview with {bootstrap?.interviewer.name || "Interviewer"}</p>
                         <p className="truncate text-[11px] font-semibold text-slate-400">{SURFACE_LABEL[surface] || "Conversation"}</p>
                     </div>
+                </div>
+
+                {/* Running interview timer — centered, red, HH:MM:SS since admit. */}
+                <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2">
+                    <span className={`material-symbols-outlined text-[19px] ${admitted ? "text-red-500" : "text-slate-500"}`}>timer</span>
+                    <span className={`font-mono text-[17px] font-black tabular-nums ${admitted ? "text-red-500" : "text-slate-500"}`}>{admitted ? formatElapsed(runningElapsed) : "00:00:00"}</span>
+                    {admitted && <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-red-400 opacity-75" /><span className="relative inline-flex size-2 rounded-full bg-red-500" /></span>}
                 </div>
 
                 <div className="flex items-center gap-2">
