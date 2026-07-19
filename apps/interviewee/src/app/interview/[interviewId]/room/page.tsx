@@ -973,7 +973,7 @@ function CandidateRoom() {
                     </div>
                     <button type="button" onClick={() => router.push("/")} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-night shadow-sm transition-colors hover:bg-primary-dark">
                         <span className="material-symbols-outlined text-[18px]">event</span>
-                        Go to my interviews
+                        Continue
                     </button>
                     {sessionEnded && <p className="text-xs font-semibold text-slate-400">Redirecting you shortly…</p>}
                 </div>
