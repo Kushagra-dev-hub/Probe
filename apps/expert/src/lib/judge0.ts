@@ -208,19 +208,44 @@ export async function executePlainCode(input: {
 const SQLITE_LANGUAGE_ID = 82;
 
 function buildSqlScript(wrapperCode: string, userQuery: string): string {
-  const pragmas = ".headers on\n.mode column";
+  // Tab-separated output with headers parses cleanly into a table.
+  const pragmas = ".headers on\n.mode tabs";
   const injection = `${pragmas}\n\n${userQuery.trim()}`;
   const wrapper = (wrapperCode || "").trim();
   if (wrapper.includes("{{USER_QUERY}}")) return wrapper.replace("{{USER_QUERY}}", injection);
   return [wrapper, "", pragmas, "", userQuery.trim()].join("\n");
 }
 
+export type SqlTable = { columns: string[]; rows: string[][] };
+
+/** Parse tab-separated (or, as a fallback, whitespace-aligned) sqlite output into a table. */
+export function parseSqlTable(text: string | null | undefined): SqlTable {
+  const lines = (text ?? "").replace(/\r\n/g, "\n").split("\n").filter((l) => l.trim().length > 0);
+  if (lines.length === 0) return { columns: [], rows: [] };
+  const hasTabs = lines[0].includes("\t");
+  const split = (l: string) => (hasTabs ? l.split("\t") : l.trim().split(/\s{2,}/));
+  const columns = split(lines[0]).map((c) => c.trim());
+  const rows = lines
+    .slice(1)
+    .filter((l) => !/^[-\s|]+$/.test(l)) // drop separator lines from column mode
+    .map((l) => split(l).map((c) => c.trim()));
+  return { columns, rows };
+}
+
+/** Canonical form for order-insensitive comparison (works across output modes). */
 function normalizeSqlOutput(value: string | null | undefined): string {
-  return (value ?? "")
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
+  const { rows } = parseSqlTable(value);
+  if (rows.length === 0) {
+    return (value ?? "")
+      .replace(/\r\n/g, "\n")
+      .split("\n")
+      .map((line) => line.replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .sort()
+      .join("\n");
+  }
+  return rows
+    .map((r) => r.map((c) => c.replace(/\s+/g, " ").trim()).join("\t"))
     .sort()
     .join("\n");
 }
@@ -259,6 +284,10 @@ async function submitRaw(sourceCode: string, languageId: number, stdin?: string 
 export type SqlRunResult = {
   /** Raw stdout of the user's query against the seeded schema. */
   result: ExpertCodeExecutionResult;
+  /** The user's query output parsed as a table (for a proper results grid). */
+  table: SqlTable;
+  /** Expected result as a table when the question ships a solution. */
+  expectedTable: SqlTable | null;
   /** Present when the question ships expected outputs — per-case verdicts. */
   tests: TestCaseOutcome[];
   passedCount: number;
@@ -269,12 +298,32 @@ export async function executeSql(input: {
   query: string;
   wrapperCode: string;
   tests: SampleTest[];
+  /** The reference solution query — used to regenerate expected output (practers-style). */
+  solution?: string | null;
 }): Promise<SqlRunResult> {
   const script = buildSqlScript(input.wrapperCode, input.query);
   const result = await submitRaw(script, SQLITE_LANGUAGE_ID);
+  const table = parseSqlTable(result.stdout);
+
+  // Regenerate expected output by running the reference solution through the same
+  // schema — more reliable than trusting a stored, differently-formatted string.
+  let expectedNormalized: string | null = null;
+  let expectedTable: SqlTable | null = null;
+  if (input.solution?.trim()) {
+    try {
+      const solResult = await submitRaw(buildSqlScript(input.wrapperCode, input.solution), SQLITE_LANGUAGE_ID);
+      if (solResult.statusId === 3 && solResult.stdout) {
+        expectedNormalized = normalizeSqlOutput(solResult.stdout);
+        expectedTable = parseSqlTable(solResult.stdout);
+      }
+    } catch {
+      /* fall back to stored expected */
+    }
+  }
 
   const tests: TestCaseOutcome[] = input.tests.map((test, index) => {
-    const passed = result.statusId === 3 && normalizeSqlOutput(result.stdout) === normalizeSqlOutput(test.expectedOutput);
+    const expected = expectedNormalized ?? normalizeSqlOutput(test.expectedOutput);
+    const passed = result.statusId === 3 && normalizeSqlOutput(result.stdout) === expected;
     return {
       id: test.id,
       index,
@@ -291,6 +340,8 @@ export async function executeSql(input: {
 
   return {
     result,
+    table,
+    expectedTable,
     tests,
     passedCount: tests.filter((t) => t.passed).length,
     totalCount: tests.length,

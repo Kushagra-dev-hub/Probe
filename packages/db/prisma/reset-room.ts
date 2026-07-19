@@ -19,6 +19,7 @@ async function main() {
       endedAt: null,
       activeQuestionId: null,
       activeQuestionIndex: 0,
+      activeSurface: "meet",
     },
   });
   await prisma.interview.update({

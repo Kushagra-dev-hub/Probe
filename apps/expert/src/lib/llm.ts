@@ -109,6 +109,15 @@ export async function generateJson(req: LlmJsonRequest): Promise<unknown> {
   }
 
   let lastError: unknown = null;
+  // Groq (Llama) FIRST — it returns in ~1-2s vs ~20-30s for xAI's reasoning model.
+  // Gemini and xAI are fallbacks only.
+  if (groqKey) {
+    try {
+      return await callOpenAiCompatible(req, { name: "Groq", baseUrl: "https://api.groq.com/openai/v1", model: GROQ_MODEL, apiKey: groqKey });
+    } catch (err) {
+      lastError = err;
+    }
+  }
   if (geminiKey) {
     try {
       return await callGemini(req, geminiKey);
@@ -119,13 +128,6 @@ export async function generateJson(req: LlmJsonRequest): Promise<unknown> {
   if (xaiKey) {
     try {
       return await callOpenAiCompatible(req, { name: "xAI", baseUrl: "https://api.x.ai/v1", model: XAI_MODEL, apiKey: xaiKey });
-    } catch (err) {
-      lastError = err;
-    }
-  }
-  if (groqKey) {
-    try {
-      return await callOpenAiCompatible(req, { name: "Groq", baseUrl: "https://api.groq.com/openai/v1", model: GROQ_MODEL, apiKey: groqKey });
     } catch (err) {
       lastError = err;
     }

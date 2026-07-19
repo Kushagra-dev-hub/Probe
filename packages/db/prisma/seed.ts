@@ -130,7 +130,7 @@ async function main() {
 
   const interview = await prisma.interview.upsert({
     where: { id: "seed-interview" },
-    update: {},
+    update: { rounds: ["dsa"], companyName: "Probe Demo Co", roleTitle: "Backend Software Engineer", shareToken: "iv_seeddemosharetoken0001" },
     create: {
       id: "seed-interview",
       interviewerId: interviewer.id,
@@ -138,14 +138,18 @@ async function main() {
       status: "scheduled",
       scheduledAt: new Date(),
       durationMinutes: 60,
+      rounds: ["dsa"],
+      companyName: "Probe Demo Co",
+      roleTitle: "Backend Software Engineer",
+      shareToken: "iv_seeddemosharetoken0001",
     },
   });
 
   await prisma.interviewQuestion.deleteMany({ where: { interviewId: interview.id } });
   await prisma.interviewQuestion.createMany({
     data: [
-      { interviewId: interview.id, questionId: TWO_SUM.id, text: TWO_SUM.title, difficulty: TWO_SUM.difficulty, order: 0 },
-      { interviewId: interview.id, questionId: REVERSE_LL.id, text: REVERSE_LL.title, difficulty: REVERSE_LL.difficulty, order: 1 },
+      { interviewId: interview.id, questionId: TWO_SUM.id, text: TWO_SUM.title, difficulty: TWO_SUM.difficulty, type: "dsa", source: "bank", order: 0 },
+      { interviewId: interview.id, questionId: REVERSE_LL.id, text: REVERSE_LL.title, difficulty: REVERSE_LL.difficulty, type: "dsa", source: "bank", order: 1 },
     ],
   });
 

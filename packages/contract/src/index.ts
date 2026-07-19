@@ -208,6 +208,9 @@ export type ExecutionTestResult = {
   time: string | null;
 };
 
+/** A tabular query result (SQL round). */
+export type ExecutionTable = { columns: string[]; rows: string[][] };
+
 export type ExecutionResult = {
   statusId: number;
   status: string;
@@ -221,6 +224,9 @@ export type ExecutionResult = {
   tests?: ExecutionTestResult[] | null;
   passedCount?: number | null;
   totalCount?: number | null;
+  /** SQL round: the query output and expected output as tables. */
+  table?: ExecutionTable | null;
+  expectedTable?: ExecutionTable | null;
 };
 
 export type ExecutionState = {
@@ -422,6 +428,8 @@ export interface ClientToServerEvents {
   ) => void;
   /** Both sides stream their own mic transcript into conversation memory. */
   "direct:transcript": (p: TranscriptEntry) => void;
+  /** Interviewer marks the candidate's current answer complete → analyze it now. */
+  "direct:analyze-answer": (p: { interviewId: string }, ack?: (r: Ack) => void) => void;
 }
 
 export interface ServerToClientEvents {

@@ -9,6 +9,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.0",
     "@gsap/react": "^2.1.2",
     "@monaco-editor/react": "^4.6.0",
     "@phosphor-icons/react": "^2.1.10",

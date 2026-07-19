@@ -1225,3 +1225,13 @@ body.contest-active-hide-nav .flex.flex-1.overflow-hidden {
     opacity: 1;
   }
 }
+
+/* ---- Excalidraw (System Design canvas) polish ---- */
+.excalidraw .layer-ui__wrapper__footer-right,
+.excalidraw .welcome-screen-decor,
+.excalidraw a.welcome-screen-menu-item,
+.excalidraw button[aria-label="Library"],
+.excalidraw .default-sidebar-trigger,
+.excalidraw .layer-ui__wrapper__footer .encrypted-icon { display: none !important; }
+.excalidraw .App-menu__left { box-shadow: none; }
+.excalidraw { --color-primary: #4A7CFF; }

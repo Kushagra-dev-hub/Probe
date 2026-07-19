@@ -137,3 +137,10 @@ body.dark {
 .animate-pulse-glow {
   animation: pulse-glow 2.5s ease-in-out infinite;
 }
+
+/* ---- Excalidraw (System Design canvas) polish ---- */
+.excalidraw button[aria-label="Library"],
+.excalidraw .default-sidebar-trigger,
+.excalidraw .layer-ui__wrapper__footer-right,
+.excalidraw .welcome-screen-decor { display: none !important; }
+.excalidraw { --color-primary: #4A7CFF; }

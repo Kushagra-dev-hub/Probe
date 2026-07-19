@@ -3,11 +3,23 @@
 /**
  * Probe copilot UI — interviewer-only surfaces.
  *
- * CopilotPanel  : the live "ASK THIS NEXT" card stack in the room's right panel.
- * ScorecardView : the evidence-linked scorecard on the end/evaluation screen.
+ *  CopilotDock   : the always-on autonomous assistant panel (right rail). No manual
+ *                  buttons — it streams resume insight, per-answer analysis, code
+ *                  suggestions, and a live transcript as the interview happens.
+ *  ResumePdf     : the real embedded resume, rendered in the browser's native PDF
+ *                  viewer via a blob URL (scroll + zoom + page nav for free).
+ *  ScorecardView : the evidence-linked scorecard on the end screen.
  */
-import { useMemo, useState } from "react";
-import type { CopilotScorecard, CopilotStatus, CopilotSuggestion, InterviewRubric, ScorecardVerdict } from "@probe/contract";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type {
+    CopilotInsight,
+    CopilotScorecard,
+    CopilotStatus,
+    CopilotSuggestion,
+    ResumeAnalysis,
+    ScorecardVerdict,
+    TranscriptEntry,
+} from "@probe/contract";
 
 function timeAgo(iso: string) {
     const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -18,146 +30,356 @@ function timeAgo(iso: string) {
     return `${Math.floor(minutes / 60)}h ago`;
 }
 
+/* ------------------------------------------------------------------ *
+ * Embedded resume — the actual PDF in the native browser viewer.
+ * ------------------------------------------------------------------ */
+
+export function ResumePdf({ url, loading, fileName, error }: { url: string | null; loading: boolean; fileName: string | null; error: string | null }) {
+    return (
+        <div className="flex h-full flex-col bg-slate-100 dark:bg-lc-bg">
+            <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4 py-2.5 dark:border-lc-border dark:bg-lc-surface">
+                <span className="material-symbols-outlined text-[20px] text-primary">description</span>
+                <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{fileName || "Candidate resume"}</p>
+                <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                    <span className="material-symbols-outlined text-[12px]">visibility_off</span>
+                    Interviewer only
+                </span>
+            </div>
+            <div className="relative min-h-0 flex-1">
+                {url ? (
+                    <iframe src={`${url}#view=FitH`} title={fileName || "Resume"} className="h-full w-full border-none bg-white" />
+                ) : (
+                    <div className="grid h-full place-items-center p-8 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                            <span className={`material-symbols-outlined text-4xl text-slate-300 dark:text-slate-600 ${loading ? "animate-pulse" : ""}`}>
+                                {error ? "error" : "picture_as_pdf"}
+                            </span>
+                            <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                                {error || (loading ? "Loading resume…" : "No resume uploaded yet.")}
+                            </p>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ *
+ * CopilotDock — the autonomous assistant. Everything auto-updates.
+ * ------------------------------------------------------------------ */
+
+const VERDICT_CHIP: Record<CopilotInsight["verdict"], { label: string; cls: string }> = {
+    correct: { label: "Correct", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400" },
+    "partially-correct": { label: "Partial", cls: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" },
+    incorrect: { label: "Incorrect", cls: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400" },
+    evasive: { label: "Bluffing / evasive", cls: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400" },
+    unclear: { label: "Unclear", cls: "bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-300" },
+};
+
 const CONFIDENCE_STYLE: Record<CopilotSuggestion["confidence"], string> = {
     high: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400",
     medium: "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400",
     low: "bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-300",
 };
 
-const SURFACE_LABEL: Record<CopilotSuggestion["surface"], string> = {
-    ide: "IDE",
-    runs: "Run results",
-    question: "Question",
-};
+type FeedItem =
+    | { kind: "insight"; at: string; data: CopilotInsight }
+    | { kind: "suggestion"; at: string; data: CopilotSuggestion };
 
-function statusMeta(status: CopilotStatus | null, hasLlm: boolean) {
-    const state = status?.state ?? (hasLlm ? "watching" : "disabled");
-    if (state === "thinking") return { label: "Reading the work…", dot: "animate-pulse bg-indigo-500", text: "text-indigo-600 dark:text-indigo-400" };
+function statusMeta(status: CopilotStatus | null) {
+    const state = status?.state ?? "watching";
+    if (state === "thinking") return { label: status?.detail || "Thinking…", dot: "animate-pulse bg-indigo-500", text: "text-indigo-600 dark:text-indigo-400" };
     if (state === "error") return { label: "Copilot error", dot: "bg-red-500", text: "text-red-600 dark:text-red-400" };
     if (state === "disabled") return { label: "Copilot off", dot: "bg-slate-400", text: "text-slate-500" };
-    return { label: "Watching the work", dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" };
+    return { label: "Live — watching & listening", dot: "bg-emerald-500 animate-pulse", text: "text-emerald-600 dark:text-emerald-400" };
 }
 
-export function CopilotPanel({
+export function CopilotDock({
     suggestions,
+    insights,
     status,
-    rubric,
-    onAnalyze,
-    canAnalyze,
+    resumeAnalysis,
+    transcript,
+    listening,
+    onAnalyzeAnswer,
 }: {
     suggestions: CopilotSuggestion[];
+    insights: CopilotInsight[];
     status: CopilotStatus | null;
-    rubric: InterviewRubric | null;
-    onAnalyze: () => void;
-    canAnalyze: boolean;
+    resumeAnalysis: ResumeAnalysis | null;
+    transcript: TranscriptEntry[];
+    listening: boolean;
+    onAnalyzeAnswer: () => void;
 }) {
-    const [showHistory, setShowHistory] = useState(false);
-    const [showRubric, setShowRubric] = useState(false);
-    const latest = suggestions[suggestions.length - 1] ?? null;
-    const history = suggestions.slice(0, -1).reverse();
-    const rubricTitle = useMemo(() => {
-        const map = new Map((rubric?.items ?? []).map((item) => [item.key, item.title]));
-        return (key: string | null) => (key ? map.get(key) ?? key.replace(/_/g, " ") : null);
-    }, [rubric]);
-    const meta = statusMeta(status, true);
-    const thinking = status?.state === "thinking";
+    const meta = statusMeta(status);
+    const [resumeOpen, setResumeOpen] = useState(true);
+    const [justSent, setJustSent] = useState(false);
+
+    const sendAnswer = () => {
+        onAnalyzeAnswer();
+        setJustSent(true);
+        window.setTimeout(() => setJustSent(false), 1400);
+    };
+
+    // Press Enter anywhere (except while typing in a field / the code editor) to
+    // send the candidate's current answer to the copilot — the primary trigger.
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== "Enter" || e.shiftKey || e.metaKey || e.ctrlKey) return;
+            const el = document.activeElement as HTMLElement | null;
+            if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+            e.preventDefault();
+            sendAnswer();
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [onAnalyzeAnswer]);
+
+    // Merge answer insights + code suggestions into one reverse-chronological feed.
+    const feed = useMemo<FeedItem[]>(() => {
+        const items: FeedItem[] = [
+            ...insights.map((i) => ({ kind: "insight" as const, at: i.createdAt, data: i })),
+            ...suggestions.map((s) => ({ kind: "suggestion" as const, at: s.createdAt, data: s })),
+        ];
+        return items.sort((a, b) => b.at.localeCompare(a.at));
+    }, [insights, suggestions]);
+
+    // Auto-scroll the live transcript strip to the newest line.
+    const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+    const finals = useMemo(() => transcript.filter((t) => t.isFinal).slice(-40), [transcript]);
+    useEffect(() => {
+        transcriptEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }, [finals.length]);
 
     return (
-        <div className="rounded-xl border border-indigo-200 bg-white p-4 dark:border-indigo-500/30 dark:bg-lc-bg">
-            <div className="flex items-center justify-between">
+        <div className="flex h-full flex-col overflow-hidden bg-white dark:bg-lc-surface">
+            {/* Header — status only, no controls */}
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-lc-border">
                 <div className="flex items-center gap-2">
-                    <span className="grid size-5 place-items-center rounded-md bg-indigo-600 text-[10px] font-bold text-white">P</span>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Probe copilot</p>
+                    <span className="grid size-6 place-items-center rounded-md bg-indigo-600 text-[11px] font-black text-white">P</span>
+                    <div>
+                        <p className="font-nunito text-sm font-extrabold text-slate-900 dark:text-white">Probe Copilot</p>
+                        <p className={`flex items-center gap-1.5 text-[10px] font-bold ${meta.text}`}>
+                            <span className={`size-1.5 rounded-full ${meta.dot}`} />
+                            {meta.label}
+                        </p>
+                    </div>
                 </div>
-                <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold ${meta.text}`}>
-                    <span className={`size-1.5 rounded-full ${meta.dot}`} />
-                    {meta.label}
-                </span>
+                {listening && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
+                        <span className="material-symbols-outlined animate-pulse text-[13px]">graphic_eq</span>
+                        Listening
+                    </span>
+                )}
             </div>
 
-            {status?.state === "error" && status.detail && (
-                <p className="mt-2 rounded-lg bg-red-50 p-2 text-[11px] font-semibold text-red-600 dark:bg-red-500/10 dark:text-red-400">{status.detail}</p>
-            )}
-
-            {latest ? (
-                <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
-                    <div className="flex items-center justify-between gap-2">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Ask this next</p>
-                        <span className="text-[10px] font-semibold text-slate-400">{timeAgo(latest.createdAt)}</span>
+            {/* Scrollable body */}
+            <div className="custom-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+                {/* Resume digest — appears automatically once analyzed */}
+                {resumeAnalysis && (
+                    <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+                        <button type="button" onClick={() => setResumeOpen((v) => !v)} className="flex w-full items-center justify-between">
+                            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                                <span className="material-symbols-outlined text-[15px]">contact_page</span>
+                                Resume read
+                            </span>
+                            <span className="material-symbols-outlined text-[16px] text-indigo-400">{resumeOpen ? "expand_less" : "expand_more"}</span>
+                        </button>
+                        {resumeOpen && (
+                            <div className="mt-2 space-y-2">
+                                <p className="text-[12px] font-medium leading-relaxed text-slate-700 dark:text-slate-200">{resumeAnalysis.summary}</p>
+                                {resumeAnalysis.recommendedQuestions.length > 0 && (
+                                    <div className="space-y-1.5">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">Ask about their work</p>
+                                        {resumeAnalysis.recommendedQuestions.slice(0, 6).map((q, i) => (
+                                            <div key={i} className="rounded-lg bg-white p-2 dark:bg-lc-bg">
+                                                <p className="text-[12px] font-bold text-slate-800 dark:text-slate-100">{q.question}</p>
+                                                <p className="text-[10px] font-semibold text-slate-400">{q.topic}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {(resumeAnalysis.redFlags.length > 0 || resumeAnalysis.strongAreas.length > 0) && (
+                                    <div className="flex flex-wrap gap-1">
+                                        {resumeAnalysis.strongAreas.slice(0, 4).map((s, i) => (
+                                            <span key={`s${i}`} className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">✓ {s}</span>
+                                        ))}
+                                        {resumeAnalysis.redFlags.slice(0, 4).map((s, i) => (
+                                            <span key={`f${i}`} className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">? {s}</span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
-                    <p className="mt-1.5 text-[14px] font-bold leading-snug text-slate-900 dark:text-white">&ldquo;{latest.ask}&rdquo;</p>
-                    <p className="mt-2 text-[12px] font-medium leading-relaxed text-slate-600 dark:text-slate-300">{latest.observation}</p>
-                    {latest.evidence && (
-                        <pre className="custom-scrollbar mt-2 max-h-24 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-2.5 font-mono text-[11px] leading-relaxed text-slate-100">{latest.evidence}</pre>
+                )}
+
+                {/* Live feed of insights + suggestions */}
+                {feed.length === 0 && !resumeAnalysis && (
+                    <div className="rounded-xl bg-slate-50 p-4 text-center dark:bg-lc-bg">
+                        <span className="material-symbols-outlined mb-1 text-2xl text-indigo-300">neurology</span>
+                        <p className="text-[12px] font-semibold text-slate-500 dark:text-slate-400">
+                            Probe is listening and reading the work. It surfaces the next question to ask the moment there&apos;s something worth asking — automatically.
+                        </p>
+                    </div>
+                )}
+
+                {feed.map((item, i) =>
+                    item.kind === "insight" ? (
+                        <InsightCard key={item.data.id} insight={item.data} defaultOpen={i === 0} />
+                    ) : (
+                        <SuggestionCard key={item.data.id} suggestion={item.data} defaultOpen={i === 0} />
+                    )
+                )}
+            </div>
+
+            {/* Live transcript strip — condensed (… + last lines), with the
+                Enter-to-analyze affordance. Recording is continuous; the interviewer
+                decides when the answer is complete. */}
+            <div className="shrink-0 border-t border-slate-200 bg-slate-50/60 dark:border-lc-border dark:bg-lc-bg">
+                <div className="flex items-center justify-between px-3 pt-2">
+                    <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        <span className={`material-symbols-outlined text-[14px] ${listening ? "text-emerald-500" : ""}`}>{listening ? "graphic_eq" : "forum"}</span>
+                        Live transcript
+                    </p>
+                    {finals.length > 3 && <span className="text-[10px] font-semibold text-slate-400">…{finals.length - 3} earlier</span>}
+                </div>
+                <div className="custom-scrollbar max-h-20 space-y-0.5 overflow-y-auto px-3 pb-1.5 pt-1">
+                    {finals.length === 0 ? (
+                        <p className="py-1 text-[11px] italic text-slate-400">Listening… speech appears here as it&apos;s spoken.</p>
+                    ) : (
+                        finals.slice(-3).map((t, i) => (
+                            <p key={i} className="truncate text-[11px] leading-snug">
+                                <span className={`font-bold ${t.speaker === "interviewer" ? "text-blue-500" : "text-indigo-500"}`}>
+                                    {t.speaker === "interviewer" ? "You" : "Candidate"}:
+                                </span>{" "}
+                                <span className="text-slate-600 dark:text-slate-300">{t.text}</span>
+                            </p>
+                        ))
                     )}
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                        {latest.evidenceLines && (
-                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-white/[0.08] dark:text-slate-300">{latest.evidenceLines}</span>
-                        )}
-                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-white/[0.08] dark:text-slate-300">{SURFACE_LABEL[latest.surface]}</span>
-                        {latest.rubricKey && (
-                            <span className="rounded-md bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">{rubricTitle(latest.rubricKey)}</span>
-                        )}
-                        <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold capitalize ${CONFIDENCE_STYLE[latest.confidence]}`}>{latest.confidence} confidence</span>
+                    <div ref={transcriptEndRef} />
+                </div>
+                <div className="px-2.5 pb-2.5 pt-1">
+                    <button
+                        type="button"
+                        onClick={sendAnswer}
+                        className={`flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-[13px] font-bold text-white shadow-sm transition-colors ${justSent ? "bg-emerald-500" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                    >
+                        <span className="material-symbols-outlined text-[18px]">{justSent ? "check" : "keyboard_return"}</span>
+                        {justSent ? "Sent to Copilot" : "Answer done — analyze"}
+                        <kbd className="ml-1 rounded bg-white/20 px-1.5 py-0.5 font-mono text-[10px]">Enter</kbd>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function scoreColor(score: number): string {
+    if (score >= 75) return "bg-emerald-500";
+    if (score >= 50) return "bg-amber-500";
+    if (score >= 30) return "bg-orange-500";
+    return "bg-rose-500";
+}
+
+function InsightCard({ insight, defaultOpen }: { insight: CopilotInsight; defaultOpen: boolean }) {
+    const [open, setOpen] = useState(defaultOpen);
+    const chip = VERDICT_CHIP[insight.verdict] ?? VERDICT_CHIP.unclear;
+    const score = insight.score;
+    return (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-lc-border dark:bg-lc-bg">
+            {/* Scorecard header — verdict + score gauge (practers report style). Click to collapse. */}
+            <button type="button" onClick={() => setOpen((v) => !v)} className="w-full border-b border-slate-100 bg-slate-50/70 px-3 py-2.5 text-left dark:border-lc-border dark:bg-white/[0.02]">
+                <div className="flex items-center justify-between gap-2">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${chip.cls}`}>{chip.label}</span>
+                    <div className="flex items-center gap-2">
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold capitalize text-slate-500 dark:bg-white/[0.06] dark:text-slate-300">{insight.confidence} conf</span>
+                        <span className="text-[10px] font-semibold text-slate-400">{timeAgo(insight.createdAt)}</span>
+                        <span className="material-symbols-outlined text-[16px] text-slate-400">{open ? "expand_less" : "expand_more"}</span>
                     </div>
                 </div>
-            ) : (
-                <p className="mt-3 rounded-lg bg-slate-50 p-3 text-[12px] font-semibold text-slate-500 dark:bg-lc-surface dark:text-slate-400">
-                    Probe reads the candidate&apos;s code and runs as they work, and drops the one follow-up worth asking here. Nothing is shown to the candidate.
-                </p>
-            )}
-
-            <button
-                type="button"
-                onClick={onAnalyze}
-                disabled={!canAnalyze || thinking}
-                className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-                <span className={`material-symbols-outlined text-[18px] ${thinking ? "animate-spin" : ""}`}>{thinking ? "progress_activity" : "neurology"}</span>
-                {thinking ? "Reading the work…" : "Suggest a question now"}
+                {score != null && (
+                    <div className="mt-2">
+                        <div className="flex items-end justify-between">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Answer quality</span>
+                            <span className="font-mono text-[15px] font-black leading-none text-slate-900 dark:text-white">{score}<span className="text-[10px] font-bold text-slate-400">/100</span></span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-lc-border">
+                            <div className={`h-full rounded-full ${scoreColor(score)} transition-all`} style={{ width: `${score}%` }} />
+                        </div>
+                    </div>
+                )}
+                {!open && insight.question && <p className="mt-1.5 truncate text-[11px] font-semibold italic text-slate-400">Q: {insight.question}</p>}
             </button>
-
-            {history.length > 0 && (
-                <div className="mt-3">
-                    <button type="button" onClick={() => setShowHistory((v) => !v)} className="flex w-full items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                        Earlier suggestions ({history.length})
-                        <span className="material-symbols-outlined text-[16px]">{showHistory ? "expand_less" : "expand_more"}</span>
-                    </button>
-                    {showHistory && (
-                        <div className="mt-2 space-y-2">
-                            {history.map((s) => (
-                                <div key={s.id} className="rounded-lg border border-slate-200 p-2.5 dark:border-lc-border">
-                                    <p className="text-[12px] font-bold text-slate-800 dark:text-slate-200">&ldquo;{s.ask}&rdquo;</p>
-                                    <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">{s.observation}</p>
-                                    <p className="mt-1 text-[10px] font-semibold text-slate-400">{timeAgo(s.createdAt)}{s.evidenceLines ? ` · ${s.evidenceLines}` : ""}</p>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {rubric && rubric.items.length > 0 && (
-                <div className="mt-3 border-t border-slate-100 pt-3 dark:border-lc-border">
-                    <button type="button" onClick={() => setShowRubric((v) => !v)} className="flex w-full items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                        Role pack · {rubric.roleTitle || "General"} ({rubric.items.length})
-                        <span className="material-symbols-outlined text-[16px]">{showRubric ? "expand_less" : "expand_more"}</span>
-                    </button>
-                    {showRubric && (
-                        <div className="mt-2 space-y-1.5">
-                            {rubric.items.map((item) => (
-                                <div key={item.key} className="rounded-lg bg-slate-50 p-2 dark:bg-lc-surface">
-                                    <p className="text-[12px] font-bold text-slate-800 dark:text-slate-200">{item.title}</p>
-                                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{item.description}</p>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+            {open && (
+            <div className="p-3">
+                {insight.question && <p className="mb-1 text-[11px] font-semibold italic text-slate-400">Q: {insight.question}</p>}
+                <p className="text-[12px] font-medium leading-relaxed text-slate-700 dark:text-slate-200">{insight.summary}</p>
+                {insight.bluff && (
+                    <p className="mt-1.5 flex items-start gap-1 rounded-md bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">
+                        <span className="material-symbols-outlined text-[13px]">warning</span> {insight.bluff}
+                    </p>
+                )}
+                {insight.missingConcepts.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                        {insight.missingConcepts.map((c, i) => (
+                            <span key={i} className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">missing: {c}</span>
+                        ))}
+                    </div>
+                )}
+                {insight.followups.length > 0 && (
+                    <div className="mt-2 space-y-1 rounded-lg bg-indigo-50/60 p-2 dark:bg-indigo-500/10">
+                        <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                            <span className="material-symbols-outlined text-[13px]">quiz</span> Ask this next
+                        </p>
+                        {insight.followups.map((f, i) => (
+                            <p key={i} className="text-[12px] font-semibold text-slate-800 dark:text-slate-200">• {f}</p>
+                        ))}
+                    </div>
+                )}
+            </div>
             )}
         </div>
     );
 }
+
+function SuggestionCard({ suggestion, defaultOpen }: { suggestion: CopilotSuggestion; defaultOpen: boolean }) {
+    const [open, setOpen] = useState(defaultOpen);
+    return (
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+            <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between text-left">
+                <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+                    <span className="material-symbols-outlined text-[13px]">code</span> Ask this next
+                </p>
+                <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-semibold text-slate-400">{timeAgo(suggestion.createdAt)}</span>
+                    <span className="material-symbols-outlined text-[16px] text-indigo-400">{open ? "expand_less" : "expand_more"}</span>
+                </div>
+            </button>
+            <p className="mt-1 text-[13px] font-bold leading-snug text-slate-900 dark:text-white">&ldquo;{suggestion.ask}&rdquo;</p>
+            {open && (
+                <>
+                    <p className="mt-1 text-[12px] font-medium text-slate-600 dark:text-slate-300">{suggestion.observation}</p>
+                    {suggestion.evidence && (
+                        <pre className="custom-scrollbar mt-1.5 max-h-20 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-2 font-mono text-[10px] leading-relaxed text-slate-100">{suggestion.evidence}</pre>
+                    )}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                        {suggestion.evidenceLines && (
+                            <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-white/[0.08] dark:text-slate-300">{suggestion.evidenceLines}</span>
+                        )}
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold capitalize ${CONFIDENCE_STYLE[suggestion.confidence]}`}>{suggestion.confidence}</span>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ *
+ * ScorecardView — the evidence-linked scorecard on the end screen.
+ * ------------------------------------------------------------------ */
 
 const VERDICT_STYLE: Record<ScorecardVerdict, { badge: string; icon: string }> = {
     strong: { badge: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400", icon: "check_circle" },
@@ -201,13 +423,11 @@ export function ScorecardView({
                     {generating ? "Drafting…" : scorecard ? "Regenerate" : "Generate"}
                 </button>
             </div>
-            <p className="mt-1 text-[11px] font-semibold text-slate-400">
-                Drafted from the session log — every row cites the work. Review before you rely on it; Probe never makes the decision.
-            </p>
+            <p className="mt-1 text-[11px] font-semibold text-slate-400">Drafted from the session log — every row cites the work. Review before you rely on it; Probe never makes the decision.</p>
 
             {!scorecard ? (
                 <p className="mt-4 rounded-lg bg-slate-50 p-4 text-sm font-semibold text-slate-500 dark:bg-lc-bg dark:text-slate-400">
-                    {generating ? "Reading the session log…" : "No scorecard yet — generate one from the session's code, runs, and observations."}
+                    {generating ? "Reading the session log…" : "No scorecard yet — generate one from the session's code, runs, and answers."}
                 </p>
             ) : (
                 <>

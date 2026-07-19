@@ -13,8 +13,11 @@ import "katex/dist/katex.min.css";
 import { useAuth } from "@/context/auth-context";
 import { useInterviewRoom } from "@/hooks/use-interview-room";
 import { api } from "@/lib/api";
-import { CopilotPanel, ScorecardView } from "@/components/copilot";
-import type { CopilotScorecard, CopilotSuggestion, InterviewRubric } from "@probe/contract";
+import { CopilotDock, ResumePdf, ScorecardView } from "@/components/copilot";
+import { DesignBoard, DesignExtras } from "@/components/design-board";
+import { SqlSchema, SqlResultView } from "@/components/sql-view";
+import { SpeechCapture } from "@/components/speech-capture";
+import type { CopilotInsight, CopilotScorecard, CopilotSuggestion, InterviewRubric, ResumeAnalysis, RoomSurface } from "@probe/contract";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -247,6 +250,8 @@ function normalizeQuestionMarkdown(value?: string | null) {
     return stripUnsafeHtmlToMarkdown(normalizeAuthoringEscapes(value))
         .replace(/\r\n/g, "\n")
         .replace(/([^\n])\n(?=(Input Format|Output Format|Examples?|Constraints)\b)/gi, "$1\n\n")
+        // GFM needs a blank line before a pipe-table, or it renders as raw text.
+        .replace(/([^\n|])\n(\s*\|)/g, "$1\n\n$2")
         .trim();
 }
 
@@ -427,6 +432,26 @@ function getIceServers(): RTCIceServer[] {
     return [{ urls: "stun:stun.l.google.com:19302" }];
 }
 
+const SURFACE_META: Record<RoomSurface, { label: string; icon: string }> = {
+    meet: { label: "Meeting", icon: "videocam" },
+    dsa: { label: "DSA IDE", icon: "code" },
+    sql: { label: "SQL IDE", icon: "database" },
+    design: { label: "System Design", icon: "design_services" },
+};
+
+function roundToSurface(round?: string | null): RoomSurface {
+    const value = (round || "").toLowerCase();
+    if (value === "sql") return "sql";
+    if (value === "design" || value === "system_design" || value === "systemdesign") return "design";
+    if (value === "meet" || value === "meeting") return "meet";
+    return "dsa";
+}
+
+function questionSurface(question?: { type?: string | null } | null): RoomSurface {
+    if (!question?.type) return "dsa";
+    return roundToSurface(question.type);
+}
+
 function InterviewerRoom() {
     const { session } = useAuth();
     const params = useParams<{ interviewId: string }>();
@@ -478,7 +503,7 @@ function InterviewerRoom() {
     const [panelCollapsed, setPanelCollapsed] = useState(false);
     const [savingEval, setSavingEval] = useState(false);
     const [leftWidth, setLeftWidth] = useState(480);
-    const [rightWidth, setRightWidth] = useState(360);
+    const [rightWidth, setRightWidth] = useState(400);
     const [resultsHeight, setResultsHeight] = useState(280);
     const [screenLive, setScreenLive] = useState(false);
     const [screenStatus, setScreenStatus] = useState<"idle" | "requested" | "active">("idle");
@@ -492,6 +517,7 @@ function InterviewerRoom() {
     const videoDraggedRef = useRef(false);
     const questionDetailsCacheRef = useRef<Record<string, DsaQuestionDetails>>({});
     const {
+        baseUrl,
         connected,
         loading,
         joining,
@@ -531,11 +557,22 @@ function InterviewerRoom() {
         copilotSuggestions,
         copilotStatus,
         copilotScorecard,
+        copilotInsights,
+        resumeAnalysis,
+        surfaceState,
+        transcript,
         requestCopilotAnalysis,
         requestCopilotScorecard,
         seedCopilotState,
+        changeSurface,
+        sendTranscript,
+        analyzeAnswer,
         reload,
     } = useInterviewRoom(identifier);
+    const [resumeOpen, setResumeOpen] = useState(false);
+    const [resumePdfUrl, setResumePdfUrl] = useState<string | null>(null);
+    const [resumeFileLoading, setResumeFileLoading] = useState(false);
+    const [resumeFileError, setResumeFileError] = useState<string | null>(null);
     const [rubric, setRubric] = useState<InterviewRubric | null>(null);
     const [scorecardGenerating, setScorecardGenerating] = useState(false);
 
@@ -543,13 +580,18 @@ function InterviewerRoom() {
     // live updates then stream in over the socket.
     useEffect(() => {
         if (!session?.access_token || !identifier) return;
-        api.get<{ rubric: InterviewRubric | null; suggestions: CopilotSuggestion[]; scorecard: CopilotScorecard | null }>(
+        api.get<{ rubric: InterviewRubric | null; suggestions: CopilotSuggestion[]; scorecard: CopilotScorecard | null; insights?: CopilotInsight[]; resumeAnalysis?: ResumeAnalysis | null }>(
             `/interviews/${identifier}/copilot`,
             session.access_token
         )
             .then((data) => {
                 setRubric(data.rubric);
-                seedCopilotState({ suggestions: data.suggestions, scorecard: data.scorecard });
+                seedCopilotState({
+                    suggestions: data.suggestions,
+                    scorecard: data.scorecard,
+                    insights: data.insights,
+                    resumeAnalysis: data.resumeAnalysis,
+                });
             })
             .catch(() => {});
     }, [identifier, seedCopilotState, session?.access_token]);
@@ -562,6 +604,27 @@ function InterviewerRoom() {
         setScorecardGenerating(true);
         requestCopilotScorecard();
     }, [requestCopilotScorecard]);
+
+    // Fetch the real resume PDF (with auth) as a blob and hand ResumePdf an object URL.
+    // Runs when the interviewer opens the resume and one exists on the interview.
+    useEffect(() => {
+        if (!resumeOpen || !bootstrap?.resume || !session?.access_token) return;
+        let revoked = false;
+        let objUrl: string | null = null;
+        setResumeFileLoading(true);
+        setResumeFileError(null);
+        fetch(`${baseUrl}/interviews/${identifier}/resume/file`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+            .then(async (r) => { if (!r.ok) throw new Error("Could not load the resume file."); return r.blob(); })
+            .then((blob) => { if (revoked) return; objUrl = URL.createObjectURL(blob); setResumePdfUrl(objUrl); })
+            .catch((e) => { if (!revoked) setResumeFileError(e instanceof Error ? e.message : "Could not load the resume."); })
+            .finally(() => { if (!revoked) setResumeFileLoading(false); });
+        // Belt-and-suspenders: if analysis isn't ready yet, trigger it (it normally runs on upload).
+        if (!resumeAnalysis) {
+            fetch(`${baseUrl}/interviews/${identifier}/resume/analyze`, { method: "POST", headers: { Authorization: `Bearer ${session.access_token}` } }).catch(() => {});
+        }
+        return () => { revoked = true; if (objUrl) URL.revokeObjectURL(objUrl); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [resumeOpen, bootstrap?.resume, session?.access_token, baseUrl, identifier]);
 
     const status = roomState?.status || bootstrap?.status || "scheduled";
     const admitted = Boolean(roomState?.candidateAdmittedAt || bootstrap?.candidateAdmittedAt || status === "active");
@@ -1089,6 +1152,45 @@ function InterviewerRoom() {
         router.push("/");
     }, [evaluationConcerns, evaluationNotes, evaluationRecommendation, evaluationScore, evaluationStrengths, router, saveEvaluation]);
 
+    // --- Meet-first surfaces -------------------------------------------------
+    const activeSurface: RoomSurface = surfaceState?.surface ?? bootstrap?.activeSurface ?? "meet";
+    const meetActive = activeSurface === "meet" && !resumeOpen;
+    const isCodingSurface = !resumeOpen && (activeSurface === "dsa" || activeSurface === "sql" || activeSurface === "design");
+    const showRunButton = !resumeOpen && (activeSurface === "dsa" || activeSurface === "sql");
+    const runLanguage = activeSurface === "sql" ? "sql" : language;
+    const editorMonacoLanguage = activeSurface === "sql" ? "sql" : activeSurface === "design" ? "markdown" : monacoLanguage(language);
+    const resumeLoading = Boolean(bootstrap?.resume) && !resumeAnalysis;
+    const hasResume = Boolean(bootstrap?.resume);
+    const speechEnabled = admitted && !isMuted && !sessionEnded;
+
+    const roundSurfaces = useMemo<RoomSurface[]>(() => {
+        const set = new Set<RoomSurface>();
+        (bootstrap?.rounds || []).forEach((round) => set.add(roundToSurface(round)));
+        if (set.size === 0) questions.forEach((question) => set.add(questionSurface(question)));
+        set.delete("meet");
+        return Array.from(set);
+    }, [bootstrap?.rounds, questions]);
+
+    const surfaceQuestions = useMemo(
+        () => questions.filter((question) => questionSurface(question) === activeSurface),
+        [questions, activeSurface]
+    );
+
+    const recentTranscript = useMemo(() => transcript.slice(-6), [transcript]);
+
+    const launchSurface = useCallback((surface: RoomSurface) => {
+        setResumeOpen(false);
+        changeSurface(surface);
+        if (surface === "meet") return;
+        const currentMatches = activeQuestion && questionSurface(activeQuestion) === surface;
+        if (currentMatches) return;
+        const first = questions.find((question) => questionSurface(question) === surface);
+        if (first) {
+            setPendingQuestionId(first.id);
+            selectQuestion(first.id);
+        }
+    }, [activeQuestion, changeSurface, questions, selectQuestion]);
+
     if (loading) {
         return (
             <main className="grid min-h-full place-items-center bg-[#FAFBFC] p-8 dark:bg-lc-bg">
@@ -1282,6 +1384,40 @@ function InterviewerRoom() {
                     )}
 
                     <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden xl:flex-row">
+                        {meetActive && (
+                            <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-slate-950">
+                                {/* The persistent video stage (rendered below) fills this area once admitted. */}
+                                {!admitted && (
+                                    <div className="z-10 w-full max-w-md px-6 text-center">
+                                        <div className={`mx-auto grid size-16 place-items-center rounded-full ${lobbyRequest ? "bg-amber-500/15 text-amber-400" : "bg-slate-800 text-slate-400"}`}>
+                                            <span className="material-symbols-outlined text-4xl">{lobbyRequest ? "person_raised_hand" : "groups"}</span>
+                                        </div>
+                                        <p className="mt-4 text-lg font-bold text-white">
+                                            {lobbyRequest ? `${bootstrap?.candidate.name || "The candidate"} is waiting in the lobby` : "Waiting for the candidate to join"}
+                                        </p>
+                                        <p className="mt-1 text-xs font-semibold text-slate-400">
+                                            {lobbyRequest ? "Admit them to start the call. You can launch a coding surface once you're both in." : "You can admit now, or once they arrive in the lobby."}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={admitCandidate}
+                                            className={`mt-5 inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white shadow-lg transition-colors ${lobbyRequest ? "bg-emerald-500 hover:bg-emerald-600" : "bg-emerald-600/80 hover:bg-emerald-600"}`}
+                                        >
+                                            <span className="material-symbols-outlined text-[20px]">door_open</span>
+                                            Admit candidate
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {resumeOpen && (
+                            <div className="min-w-0 flex-1 overflow-hidden bg-white dark:bg-lc-surface">
+                                <ResumePdf url={resumePdfUrl} loading={resumeFileLoading} fileName={bootstrap?.resume?.fileName ?? null} error={resumeFileError} />
+                            </div>
+                        )}
+
+                        {isCodingSurface && (<>
                         <aside style={{ "--left-w": `${leftWidth}px` } as React.CSSProperties} className="flex w-full shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white dark:border-lc-border dark:bg-lc-surface xl:w-[var(--left-w)]">
                             <div className="flex items-center gap-1 border-b border-slate-100 px-4 dark:border-lc-border">
                                 {(["problem", "questions", "hints", "solution", "notes"] as const).map((tab) => (
@@ -1314,37 +1450,47 @@ function InterviewerRoom() {
                                                         {normalizeQuestionMarkdown(questionDetails.statement || questionDetails.problemMd || questionDetails.problem_md || questionDetails.description || "")}
                                                     </ReactMarkdown>
                                                 </div>
-                                                {questionDetails.examples && questionDetails.examples.length > 0 && (
+                                                {activeSurface !== "sql" && questionDetails.examples && questionDetails.examples.length > 0 && (
                                                     <div className="space-y-3">
                                                         <h3 className="text-[13px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Examples</h3>
                                                         {questionDetails.examples.map((example, index) => (
                                                             <div key={index} className="space-y-2 rounded-lg bg-[#F8FAFC] p-4 font-mono text-[13px] text-slate-800 dark:bg-lc-bg dark:text-[#d4d4d4]">
                                                                 <div className="font-bold text-slate-900 dark:text-white">Example {index + 1}</div>
-                                                                <div><span className="font-bold opacity-60">Input:</span> {formatValue(example.input)}</div>
-                                                                <div><span className="font-bold opacity-60">Output:</span> {formatValue(example.output)}</div>
+                                                                {formatValue(example.input).trim() && <div><span className="font-bold opacity-60">Input:</span> {formatValue(example.input)}</div>}
+                                                                {formatValue(example.output).trim() && <div><span className="font-bold opacity-60">Output:</span> {formatValue(example.output)}</div>}
                                                                 {example.explanation && (
-                                                                    <div className="border-t border-slate-200 pt-2 dark:border-lc-border/50">
-                                                                        <span className="font-bold opacity-60">Explanation:</span>{" "}
-                                                                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, rehypeSanitize, [rehypeKatex, { strict: false, throwOnError: false }]] as any} components={{ p: ({ children }) => <span>{children}</span> }}>
-                                                                            {normalizeQuestionMarkdown(example.explanation)}
-                                                                        </ReactMarkdown>
+                                                                    <div className={formatValue(example.input).trim() ? "border-t border-slate-200 pt-2 dark:border-lc-border/50" : ""}>
+                                                                        <div className="whitespace-pre-wrap font-sans leading-relaxed">
+                                                                            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, rehypeSanitize, [rehypeKatex, { strict: false, throwOnError: false }]] as any} components={{ p: ({ children }) => <p className="mb-1">{children}</p> }}>
+                                                                                {normalizeQuestionMarkdown(example.explanation)}
+                                                                            </ReactMarkdown>
+                                                                        </div>
                                                                     </div>
                                                                 )}
                                                             </div>
                                                         ))}
                                                     </div>
                                                 )}
-                                                {questionDetails.constraints && (
-                                                    <div className="space-y-3">
-                                                        <h3 className="text-[13px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Constraints</h3>
-                                                        <div className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-lc-bg">
-                                                            <ul className="list-disc space-y-1.5 pl-4 font-mono text-[13px] text-slate-800 marker:text-slate-400 dark:text-[#d4d4d4]">
-                                                                {typeof questionDetails.constraints === "string"
-                                                                    ? questionDetails.constraints.split("\n").filter((line) => line.trim()).map((line, index) => <li key={index}>{normalizePlainMathText(line)}</li>)
-                                                                    : questionDetails.constraints.map((line, index) => <li key={index}>{normalizePlainMathText(String(line))}</li>)}
-                                                            </ul>
+                                                {(() => {
+                                                    const c = questionDetails.constraints;
+                                                    const lines = typeof c === "string" ? c.split("\n").map((l) => l.trim()).filter(Boolean) : Array.isArray(c) ? c.map((l) => String(l).trim()).filter(Boolean) : [];
+                                                    if (lines.length === 0) return null;
+                                                    return (
+                                                        <div className="space-y-3">
+                                                            <h3 className="text-[13px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Constraints</h3>
+                                                            <div className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-lc-bg">
+                                                                <ul className="list-disc space-y-1.5 pl-4 font-mono text-[13px] text-slate-800 marker:text-slate-400 dark:text-[#d4d4d4]">
+                                                                    {lines.map((line, index) => <li key={index}>{normalizePlainMathText(line)}</li>)}
+                                                                </ul>
+                                                            </div>
                                                         </div>
-                                                    </div>
+                                                    );
+                                                })()}
+                                                {activeSurface === "sql" && (
+                                                    <SqlSchema examples={questionDetails.examples as any} />
+                                                )}
+                                                {activeSurface === "design" && (
+                                                    <DesignExtras followUps={(questionDetails as any)?.designMeta?.followUpQuestions} hints={questionDetails.hints} />
                                                 )}
                                             </>
                                         ) : (
@@ -1357,7 +1503,7 @@ function InterviewerRoom() {
 
                                 {leftTab === "questions" && (
                                     <div className="space-y-2">
-                                        {questions.length ? questions.map((question, index) => (
+                                        {surfaceQuestions.length ? surfaceQuestions.map((question, index) => (
                                             <button
                                                 key={question.id}
                                                 type="button"
@@ -1453,61 +1599,85 @@ function InterviewerRoom() {
 
                         <section className="flex min-w-0 flex-1 flex-col overflow-hidden border-l border-slate-200 bg-white dark:border-lc-border dark:bg-lc-surface">
                             <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 dark:border-lc-border">
-                                <select
-                                    value={language}
-                                    onChange={(event) => updateLanguage(event.target.value)}
-                                    disabled
-                                    title="Candidate controls the live editor language"
-                                    className="rounded-xl border border-slate-200 bg-slate-100 px-2 py-1 text-[12px] font-bold text-slate-700 disabled:opacity-70 dark:border-lc-border dark:bg-lc-bg dark:text-white"
-                                >
-                                    {EDITOR_LANGUAGES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                                </select>
-                                <div className="ml-auto flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={resetStarterCode}
+                                {activeSurface !== "design" && (
+                                    <select
+                                        value={language}
+                                        onChange={(event) => updateLanguage(event.target.value)}
                                         disabled
-                                        className="flex items-center gap-1 text-[12px] font-semibold text-slate-500 transition-colors hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#ababab] dark:hover:text-white"
-                                        title="Candidate controls the live editor"
+                                        title="Candidate controls the live editor language"
+                                        className="rounded-xl border border-slate-200 bg-slate-100 px-2 py-1 text-[12px] font-bold text-slate-700 disabled:opacity-70 dark:border-lc-border dark:bg-lc-bg dark:text-white"
                                     >
-                                        <span className="material-symbols-outlined text-[16px]">restart_alt</span>
-                                        <span>Reset</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        disabled={!code.trim() || executionRunning || Boolean(sessionEnded)}
-                                        onClick={() => executeCode({ questionId: activeQuestion?.id || null, language, code, mode: "run" })}
-                                        className={`flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-bold shadow-sm transition-colors dark:border-lc-border ${executionRunning ? "cursor-not-allowed bg-slate-100 text-slate-400 opacity-50" : "bg-white text-slate-700 hover:bg-slate-50 dark:bg-lc-surface dark:text-[#eff1f6] dark:hover:bg-lc-hover"}`}
-                                    >
-                                        <span className="material-symbols-outlined text-[18px]">{executionRunning ? "sync" : "play_arrow"}</span>
-                                        {executionRunning ? "Running..." : "Run"}
-                                    </button>
+                                        {EDITOR_LANGUAGES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                    </select>
+                                )}
+                                <div className="ml-auto flex items-center gap-2">
+                                    {isCodingSurface && (
+                                        <button
+                                            type="button"
+                                            onClick={requestCopilotAnalysis}
+                                            className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm font-bold text-indigo-700 transition-colors hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300"
+                                        >
+                                            <span className="material-symbols-outlined text-[18px]">neurology</span>
+                                            Analyse IDE
+                                        </button>
+                                    )}
+                                    {activeSurface !== "design" && (
+                                        <button
+                                            type="button"
+                                            onClick={resetStarterCode}
+                                            disabled
+                                            className="flex items-center gap-1 text-[12px] font-semibold text-slate-500 transition-colors hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#ababab] dark:hover:text-white"
+                                            title="Candidate controls the live editor"
+                                        >
+                                            <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                                            <span>Reset</span>
+                                        </button>
+                                    )}
+                                    {showRunButton && (
+                                        <button
+                                            type="button"
+                                            disabled={!code.trim() || executionRunning || Boolean(sessionEnded)}
+                                            onClick={() => executeCode({ questionId: activeQuestion?.id || null, language: runLanguage, code, mode: "run" })}
+                                            className={`flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-bold shadow-sm transition-colors dark:border-lc-border ${executionRunning ? "cursor-not-allowed bg-slate-100 text-slate-400 opacity-50" : "bg-white text-slate-700 hover:bg-slate-50 dark:bg-lc-surface dark:text-[#eff1f6] dark:hover:bg-lc-hover"}`}
+                                        >
+                                            <span className="material-symbols-outlined text-[18px]">{executionRunning ? "sync" : "play_arrow"}</span>
+                                            {executionRunning ? "Running..." : "Run"}
+                                        </button>
+                                    )}
+                                    {activeSurface === "design" && (
+                                        <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-500 dark:bg-lc-bg dark:text-slate-400">Live whiteboard — synced</span>
+                                    )}
                                 </div>
                             </div>
 
                             <div className="min-h-0 flex-1">
-                                <MonacoEditor
-                                    height="100%"
-                                    key={`${activeQuestion?.id || "question"}:${language}`}
-                                    language={monacoLanguage(language)}
-                                    value={code}
-                                    onChange={(value) => {
-                                        const nextCode = value || "";
-                                        codeDraftsRef.current[draftKeyFor(language)] = nextCode;
-                                        setCode(nextCode);
-                                    }}
-                                    theme="light"
-                                    options={{
-                                        minimap: { enabled: false },
-                                        fontSize: 14,
-                                        readOnly: true,
-                                        wordWrap: "on",
-                                        automaticLayout: true,
-                                        scrollBeyondLastLine: false,
-                                    }}
-                                />
+                                {activeSurface === "design" ? (
+                                    <DesignBoard value={code} readOnly onChange={undefined} theme="light" />
+                                ) : (
+                                    <MonacoEditor
+                                        height="100%"
+                                        key={`${activeQuestion?.id || "question"}:${editorMonacoLanguage}`}
+                                        language={editorMonacoLanguage}
+                                        value={code}
+                                        onChange={(value) => {
+                                            const nextCode = value || "";
+                                            codeDraftsRef.current[draftKeyFor(language)] = nextCode;
+                                            setCode(nextCode);
+                                        }}
+                                        theme="light"
+                                        options={{
+                                            minimap: { enabled: false },
+                                            fontSize: 14,
+                                            readOnly: true,
+                                            wordWrap: "on",
+                                            automaticLayout: true,
+                                            scrollBeyondLastLine: false,
+                                        }}
+                                    />
+                                )}
                             </div>
 
+                            {activeSurface !== "design" && (<>
                             <DragHandle axis="y" onDelta={(delta) => setResultsHeight((height) => clampSize(height - delta, 140, 600))} />
 
                             <div style={{ "--results-h": `${resultsHeight}px` } as React.CSSProperties} className="h-[var(--results-h)] shrink-0 border-t border-slate-200 bg-white dark:border-lc-border dark:bg-lc-surface">
@@ -1526,8 +1696,15 @@ function InterviewerRoom() {
                                             {activeExecutionState && <span className="text-xs font-bold capitalize text-slate-500">{activeExecutionState.phase} - {activeExecutionState.mode}</span>}
                                         </div>
                                     </div>
-                                    <div className="custom-scrollbar flex flex-1 flex-col overflow-auto bg-white p-4 dark:bg-lc-surface">
-                                        {activeExecutionState?.executionError ? (
+                                    <div className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-auto bg-white p-4 pb-16 dark:bg-lc-surface">
+                                        {activeSurface === "sql" ? (
+                                            <SqlResultView
+                                                table={activeExecutionState?.result?.table ?? null}
+                                                passed={activeExecutionState?.result ? ((activeExecutionState.result.passedCount ?? 0) > 0 ? activeExecutionState.result.passedCount === activeExecutionState.result.totalCount : (activeExecutionState.result.status === "Accepted")) : null}
+                                                error={activeExecutionState?.executionError ?? activeExecutionState?.result?.stderr ?? activeExecutionState?.result?.compileOutput ?? null}
+                                                ran={activeExecutionState?.phase === "completed"}
+                                            />
+                                        ) : activeExecutionState?.executionError ? (
                                             <div className="mb-3 shrink-0 rounded-lg border border-red-200 bg-red-50 p-3 font-mono text-[13px] text-red-700 whitespace-pre-wrap dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
                                                 <div className="mb-1 flex items-center gap-1.5">
                                                     <span className="material-symbols-outlined text-[16px]">error</span>
@@ -1536,8 +1713,8 @@ function InterviewerRoom() {
                                                 {activeExecutionState.executionError}
                                             </div>
                                         ) : testCasesToDisplay.length > 0 ? (
-                                            <div className="flex h-full flex-col gap-4">
-                                                <div className="flex gap-6 border-b border-slate-100 px-2 dark:border-lc-border">
+                                            <div className="flex h-full min-h-0 flex-col gap-4">
+                                                <div className="flex shrink-0 gap-6 border-b border-slate-100 px-2 dark:border-lc-border">
                                                     {testCasesToDisplay.map((testCase, index) => {
                                                         const outcome = activeExecutionState?.result?.tests?.find((t) => t.id === String(testCase.id ?? "")) ?? activeExecutionState?.result?.tests?.[index];
                                                         return (
@@ -1553,18 +1730,18 @@ function InterviewerRoom() {
                                                         );
                                                     })}
                                                 </div>
-                                                <div className="custom-scrollbar flex flex-1 gap-4 overflow-auto pb-4">
-                                                    <div className="flex min-w-0 flex-1 flex-col gap-2">
-                                                        <div className="text-[13px] font-bold uppercase tracking-wider text-slate-500">Input</div>
-                                                        <div className="custom-scrollbar flex-1 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 font-mono text-[13px] text-slate-800 dark:bg-[#1e1e1e] dark:text-[#d4d4d4]">{formatValue(testCasesToDisplay[activeTestCase]?.stdin ?? testCasesToDisplay[activeTestCase]?.input)}</div>
+                                                <div className="flex min-h-0 flex-1 gap-4 overflow-hidden pb-1">
+                                                    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+                                                        <div className="shrink-0 text-[13px] font-bold uppercase tracking-wider text-slate-500">Input</div>
+                                                        <div className="custom-scrollbar min-h-0 flex-1 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 font-mono text-[13px] text-slate-800 dark:bg-[#1e1e1e] dark:text-[#d4d4d4]">{formatValue(testCasesToDisplay[activeTestCase]?.stdin ?? testCasesToDisplay[activeTestCase]?.input)}</div>
                                                     </div>
-                                                    <div className="flex min-w-0 flex-1 flex-col gap-2">
-                                                        <div className="text-[13px] font-bold uppercase tracking-wider text-slate-500">Expected</div>
-                                                        <div className="custom-scrollbar flex-1 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 font-mono text-[13px] text-slate-800 dark:bg-[#1e1e1e] dark:text-[#d4d4d4]">{formatValue(testCasesToDisplay[activeTestCase]?.expected_output ?? testCasesToDisplay[activeTestCase]?.output)}</div>
+                                                    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+                                                        <div className="shrink-0 text-[13px] font-bold uppercase tracking-wider text-slate-500">Expected</div>
+                                                        <div className="custom-scrollbar min-h-0 flex-1 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 font-mono text-[13px] text-slate-800 dark:bg-[#1e1e1e] dark:text-[#d4d4d4]">{formatValue(testCasesToDisplay[activeTestCase]?.expected_output ?? testCasesToDisplay[activeTestCase]?.output)}</div>
                                                     </div>
-                                                    <div className="flex min-w-0 flex-1 flex-col gap-2">
-                                                        <div className="text-[13px] font-bold uppercase tracking-wider text-slate-500">Output</div>
-                                                        <div className="custom-scrollbar flex-1 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 font-mono text-[13px] text-slate-800 dark:bg-[#1e1e1e] dark:text-[#d4d4d4]">
+                                                    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+                                                        <div className="shrink-0 text-[13px] font-bold uppercase tracking-wider text-slate-500">Output</div>
+                                                        <div className="custom-scrollbar min-h-0 flex-1 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 font-mono text-[13px] text-slate-800 dark:bg-[#1e1e1e] dark:text-[#d4d4d4]">
                                                             {formatExecutionOutput(activeExecutionState?.result, activeTestCase, testCasesToDisplay[activeTestCase]?.id)}
                                                         </div>
                                                     </div>
@@ -1579,237 +1756,37 @@ function InterviewerRoom() {
                                     </div>
                                 </div>
                             </div>
+                            </>)}
                         </section>
+                        </>)}
 
-                        {!panelCollapsed && <DragHandle axis="x" className="hidden xl:flex" onDelta={(delta) => setRightWidth((width) => clampSize(width - delta, 280, 560))} />}
+                        <DragHandle axis="x" className="hidden xl:flex" onDelta={(delta) => setRightWidth((width) => clampSize(width - delta, 280, 560))} />
 
-                        <aside style={{ "--right-w": `${rightWidth}px` } as React.CSSProperties} className={`relative flex shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white dark:border-lc-border dark:bg-lc-surface ${panelCollapsed ? "w-full xl:w-[52px]" : "w-full xl:w-[var(--right-w)]"}`}>
-                            {panelCollapsed ? (
-                                <div className="flex flex-row items-center gap-2 p-2 xl:h-full xl:flex-col xl:gap-3 xl:py-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => setPanelCollapsed(false)}
-                                        title="Expand panel"
-                                        className="flex size-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-100 dark:border-lc-border dark:text-slate-200 dark:hover:bg-lc-border"
-                                    >
-                                        <span className="material-symbols-outlined text-[20px]">left_panel_open</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setPanelCollapsed(false)}
-                                        title={admitted ? "Candidate admitted" : lobbyRequest ? "Candidate waiting" : "Candidate lobby"}
-                                        className="relative flex size-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-100 dark:border-lc-border dark:text-slate-200 dark:hover:bg-lc-border"
-                                    >
-                                        <span className="material-symbols-outlined text-[20px]">{admitted ? "how_to_reg" : "groups"}</span>
-                                        {lobbyRequest && !admitted && <span className="absolute -right-0.5 -top-0.5 size-2.5 animate-pulse rounded-full bg-amber-400 ring-2 ring-white dark:ring-lc-surface" />}
-                                    </button>
-                                    <div className="flex flex-col items-center justify-center rounded-lg border border-slate-200 px-1.5 py-1.5 dark:border-lc-border" title="Time remaining">
-                                        <span className={`material-symbols-outlined text-[16px] ${remainingSeconds <= 60 ? "text-red-500" : "text-emerald-600 dark:text-emerald-400"}`}>timer</span>
-                                        <span className="mt-0.5 font-mono text-[10px] font-bold tabular-nums text-slate-700 dark:text-slate-200">{formatDuration(remainingSeconds)}</span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setPanelCollapsed(false)}
-                                        title="Final evaluation"
-                                        className="relative flex size-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-100 dark:border-lc-border dark:text-slate-200 dark:hover:bg-lc-border"
-                                    >
-                                        <span className="material-symbols-outlined text-[20px]">grade</span>
-                                        {evaluation && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-lc-surface" />}
-                                    </button>
-                                </div>
-                            ) : (
-                                <>
-                                    <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-lc-border">
-                                        <h2 className="font-nunito text-base font-bold text-slate-900 dark:text-white">Interview panel</h2>
-                                        <button
-                                            type="button"
-                                            onClick={() => setPanelCollapsed(true)}
-                                            title="Collapse panel"
-                                            className="flex size-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-lc-border"
-                                        >
-                                            <span className="material-symbols-outlined text-[20px]">right_panel_close</span>
-                                        </button>
-                                    </div>
-
-                                    <div className="custom-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-                                        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-lc-border dark:bg-lc-bg">
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Candidate</p>
-                                                <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold ${admitted ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400" : lobbyRequest ? "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400" : "bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-300"}`}>
-                                                    <span className={`size-1.5 rounded-full ${admitted ? "bg-emerald-500" : lobbyRequest ? "animate-pulse bg-amber-500" : "bg-slate-400"}`} />
-                                                    {admitted ? "In room" : lobbyRequest ? "Waiting" : "Offline"}
-                                                </span>
-                                            </div>
-                                            <div className="mt-3 flex items-center gap-3">
-                                                <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-full bg-primary/10 text-sm font-bold text-primary">
-                                                    {bootstrap?.candidate.avatarUrl ? <img src={bootstrap.candidate.avatarUrl} alt="" className="h-full w-full object-cover" /> : initials(bootstrap?.candidate.name)}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{bootstrap?.candidate.name || "Candidate"}</p>
-                                                    <p className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400">{bootstrap?.candidate.email || "—"}</p>
-                                                </div>
-                                            </div>
-                                            {!admitted ? (
-                                                <>
-                                                    <button type="button" onClick={admitCandidate} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-600">
-                                                        <span className="material-symbols-outlined text-[18px]">door_open</span>
-                                                        Admit candidate
-                                                    </button>
-                                                    <p className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
-                                                        <span className="material-symbols-outlined text-[14px]">{lobbyRequest ? "hourglass_top" : "info"}</span>
-                                                        {lobbyRequest ? "Candidate is waiting in the lobby." : "Admit now, or once the candidate joins the lobby."}
-                                                    </p>
-                                                </>
-                                            ) : (
-                                                <div className="mt-3 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500 dark:bg-lc-surface dark:text-slate-400">
-                                                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                                                    Candidate is in the room.
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-lc-border dark:bg-lc-bg">
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Proctoring</p>
-                                                <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold ${screenLive ? "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400" : screenStatus === "requested" ? "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400" : "bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-300"}`}>
-                                                    <span className={`size-1.5 rounded-full ${screenLive ? "animate-pulse bg-blue-500" : screenStatus === "requested" ? "animate-pulse bg-amber-500" : "bg-slate-400"}`} />
-                                                    {screenLive ? "Live" : screenStatus === "requested" ? "Requested" : "Not shared"}
-                                                </span>
-                                            </div>
-                                            <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">Ask the candidate to share their entire screen with audio for this round.</p>
-                                            <button type="button" onClick={handleRequestScreenShare} disabled={!admitted} className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
-                                                <span className="material-symbols-outlined text-[18px]">screen_share</span>
-                                                {screenLive ? "Re-request share" : screenStatus === "requested" ? "Request again" : "Request screen share"}
-                                            </button>
-                                            {screenLive && (
-                                                <button type="button" onClick={() => { setProctorMinimized(false); setProctorFullscreen(false); }} className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-hover">
-                                                    <span className="material-symbols-outlined text-[15px]">visibility</span>
-                                                    View candidate screen
-                                                </button>
-                                            )}
-                                            {screenLive && !screenHasSystemAudio && <p className="mt-2 text-[11px] font-semibold text-slate-400">System audio not available — relying on mic + video.</p>}
-                                        </div>
-
-                                        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-lc-border dark:bg-lc-bg">
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Session</p>
-                                                <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold ${connected ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400" : "bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-300"}`}>
-                                                    <span className={`size-1.5 rounded-full ${connected ? "bg-emerald-500" : "bg-slate-400"}`} />
-                                                    {connected ? "Live" : "Offline"}
-                                                </span>
-                                            </div>
-                                            <div className="mt-3 flex items-end justify-between">
-                                                <div>
-                                                    <p className={`font-mono text-3xl font-bold leading-none tabular-nums ${remainingSeconds <= 60 ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white"}`}>{formatDuration(remainingSeconds)}</p>
-                                                    <p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Remaining</p>
-                                                </div>
-                                                <div className="text-right text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                                                    <p>Elapsed {formatDuration(elapsedSeconds)}</p>
-                                                    <p>Total {formatDuration(totalSeconds)}</p>
-                                                </div>
-                                            </div>
-                                            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-lc-border">
-                                                <div className={`h-full rounded-full transition-all duration-500 ${progressPct >= 90 ? "bg-red-500" : progressPct >= 75 ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${progressPct}%` }} />
-                                            </div>
-                                            <div className="mt-3 grid grid-cols-2 gap-2">
-                                                <div className="rounded-lg bg-slate-50 p-2.5 dark:bg-lc-surface">
-                                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Started</p>
-                                                    <p className="mt-0.5 truncate text-xs font-bold text-slate-700 dark:text-slate-200">{roomState?.startedAt || bootstrap?.startedAt ? formatDateTime(roomState?.startedAt || bootstrap?.startedAt) : "Not started"}</p>
-                                                </div>
-                                                <div className="rounded-lg bg-slate-50 p-2.5 dark:bg-lc-surface">
-                                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Question</p>
-                                                    <p className="mt-0.5 truncate text-xs font-bold text-slate-700 dark:text-slate-200">{activeQuestion ? `${serverActiveQuestionIndex + 1} of ${questions.length}` : "Not shared"}</p>
-                                                </div>
-                                            </div>
-                                            <button type="button" disabled={joining} onClick={join} className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-hover">
-                                                <span className={`material-symbols-outlined text-[15px] ${joining ? "animate-spin" : ""}`}>sync</span>
-                                                {joining ? "Reconnecting…" : "Reconnect room"}
-                                            </button>
-                                        </div>
-
-                                        <CopilotPanel
-                                            suggestions={copilotSuggestions}
-                                            status={copilotStatus}
-                                            rubric={rubric}
-                                            onAnalyze={requestCopilotAnalysis}
-                                            canAnalyze={admitted && !sessionEnded}
-                                        />
-
-                                        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-lc-border dark:bg-lc-bg">
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Final evaluation</p>
-                                                {evaluation && <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400"><span className="material-symbols-outlined text-[14px]">check_circle</span>Saved</span>}
-                                            </div>
-
-                                            <div className="mt-3 grid grid-cols-2 gap-2">
-                                                {RECOMMENDATION_OPTIONS.map((option) => {
-                                                    const active = evaluationRecommendation === option.value;
-                                                    return (
-                                                        <button
-                                                            key={option.value}
-                                                            type="button"
-                                                            onClick={() => setEvaluationRecommendation(option.value)}
-                                                            className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-bold transition-colors ${active ? option.activeClass : "border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-surface"}`}
-                                                        >
-                                                            <span className="material-symbols-outlined text-[16px]">{option.icon}</span>
-                                                            {option.label}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-
-                                            <div className="mt-3">
-                                                <div className="flex items-center justify-between">
-                                                    <label className="text-xs font-bold text-slate-600 dark:text-slate-300">Score</label>
-                                                    <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">{evaluationScore === "" ? "—" : evaluationScore}<span className="text-slate-400">/100</span></span>
-                                                </div>
-                                                <input
-                                                    type="range"
-                                                    min={0}
-                                                    max={100}
-                                                    value={evaluationScore === "" ? 0 : Number(evaluationScore)}
-                                                    onChange={(event) => setEvaluationScore(event.target.value)}
-                                                    className="mt-2 w-full cursor-pointer accent-primary"
-                                                />
-                                            </div>
-
-                                            <textarea
-                                                value={evaluationNotes}
-                                                onChange={(event) => setEvaluationNotes(event.target.value)}
-                                                placeholder="Notes on the candidate's performance…"
-                                                className="mt-3 min-h-24 w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold leading-6 text-slate-700 placeholder:font-normal dark:border-lc-border dark:bg-lc-surface dark:text-slate-200"
-                                            />
-
-                                            <button
-                                                type="button"
-                                                disabled={savingEval}
-                                                onClick={async () => {
-                                                    setSavingEval(true);
-                                                    await saveEvaluation({
-                                                        score: evaluationScore ? Math.min(100, Number(evaluationScore)) : null,
-                                                        recommendation: evaluationRecommendation,
-                                                        notes: evaluationNotes,
-                                                    });
-                                                    setSavingEval(false);
-                                                }}
-                                                className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-70"
-                                            >
-                                                <span className={`material-symbols-outlined text-[18px] ${savingEval ? "animate-spin" : ""}`}>{savingEval ? "progress_activity" : "save"}</span>
-                                                {savingEval ? "Saving…" : evaluation ? "Update evaluation" : "Save evaluation"}
-                                            </button>
-                                            {evaluation && <p className="mt-2 text-center text-[11px] font-semibold text-slate-400">Last saved {formatDateTime(evaluation.updatedAt)}</p>}
-                                        </div>
-                                    </div>
-                                </>
-                            )}
+                        <aside style={{ "--right-w": `${rightWidth}px` } as React.CSSProperties} className="relative flex w-full shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white dark:border-lc-border dark:bg-lc-surface xl:w-[var(--right-w)]">
+                            <CopilotDock
+                                suggestions={copilotSuggestions}
+                                insights={copilotInsights}
+                                status={copilotStatus}
+                                resumeAnalysis={resumeAnalysis}
+                                transcript={transcript}
+                                listening={admitted && !isMuted && !sessionEnded}
+                                onAnalyzeAnswer={analyzeAnswer}
+                            />
                         </aside>
 
                         {admitted && (
                             <div
-                                className="fixed z-50 w-64 touch-none select-none overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl"
-                                style={videoPosition ? { left: videoPosition.left, top: videoPosition.top, cursor: "grab" } : { right: 24, top: 80, cursor: "grab" }}
-                                title="Drag to reposition. Click to enable audio."
+                                className={`fixed z-50 touch-none select-none overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl ${meetActive ? "" : "w-64"}`}
+                                style={
+                                    meetActive
+                                        ? { left: 16, top: 72, right: 400, bottom: 96 }
+                                        : videoPosition
+                                            ? { left: videoPosition.left, top: videoPosition.top, cursor: "grab" }
+                                            : { right: 408, top: 80, cursor: "grab" }
+                                }
+                                title={meetActive ? undefined : "Drag to reposition. Click to enable audio."}
                                 onPointerDown={(event) => {
+                                    if (meetActive) return;
                                     const target = event.target as HTMLElement;
                                     if (target.closest("button")) return;
                                     event.preventDefault();
@@ -1824,7 +1801,7 @@ function InterviewerRoom() {
                                     void remoteVideoRef.current?.play().catch(() => {});
                                 }}
                             >
-                                <div className="relative w-full" style={{ aspectRatio: "16/9" }}>
+                                <div className={meetActive ? "relative h-full w-full" : "relative w-full"} style={meetActive ? undefined : { aspectRatio: "16/9" }}>
                                     <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 size-full object-cover" />
                                     {!hasRemoteVideo && <div className="absolute inset-0 grid place-items-center bg-slate-900 text-xs font-bold text-slate-400">Waiting for candidate video</div>}
                                     <video
@@ -1832,11 +1809,14 @@ function InterviewerRoom() {
                                         autoPlay
                                         playsInline
                                         muted
-                                        className={`absolute bottom-2 right-2 h-[43px] w-[76px] rounded-lg border-2 border-white/30 object-cover ${isCameraOn ? "" : "hidden"}`}
+                                        className={`absolute rounded-lg border-2 border-white/30 object-cover ${meetActive ? "bottom-4 right-4 h-1/4 max-h-40 min-h-[120px] w-1/4 min-w-[180px] max-w-[280px]" : "bottom-2 right-2 h-[43px] w-[76px]"} ${isCameraOn ? "" : "hidden"}`}
                                         style={{ transform: "scaleX(-1)" }}
                                     />
                                     <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                                    <div className="absolute bottom-2 left-2 z-20 flex items-center gap-1.5">
+                                    {meetActive && (
+                                        <div className="absolute left-4 top-3 rounded-full bg-black/50 px-3 py-1 text-xs font-bold text-white">{bootstrap?.candidate.name || "Candidate"}</div>
+                                    )}
+                                    <div className={`absolute bottom-2 left-2 z-20 flex items-center gap-1.5 ${meetActive ? "hidden" : ""}`}>
                                         <button
                                             type="button"
                                             onClick={() => setIsMuted((value) => !value)}
@@ -1921,6 +1901,88 @@ function InterviewerRoom() {
                                 </div>
                             )
                         )}
+
+                        {/* Meet-style control bar — centered over the meeting area only,
+                            kept clear of the copilot dock on the right. */}
+                        {admitted && (
+                            <div
+                                style={{ left: `calc((100vw - ${panelCollapsed ? 52 : rightWidth}px) / 2)`, maxWidth: `calc(100vw - ${(panelCollapsed ? 52 : rightWidth) + 48}px)` }}
+                                className="fixed bottom-4 z-[70] flex -translate-x-1/2 flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 shadow-2xl backdrop-blur dark:border-lc-border dark:bg-lc-surface/95"
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMuted((value) => !value)}
+                                    title={isMuted ? "Unmute microphone" : "Mute microphone"}
+                                    className={`flex size-10 items-center justify-center rounded-full text-white transition-colors ${isMuted ? "bg-red-500 hover:bg-red-600" : "bg-slate-700 hover:bg-slate-800 dark:bg-slate-600"}`}
+                                >
+                                    <span className="material-symbols-outlined text-[20px]">{isMuted ? "mic_off" : "mic"}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCameraOn((value) => !value)}
+                                    title={isCameraOn ? "Turn off camera" : "Turn on camera"}
+                                    className={`flex size-10 items-center justify-center rounded-full text-white transition-colors ${!isCameraOn ? "bg-red-500 hover:bg-red-600" : "bg-slate-700 hover:bg-slate-800 dark:bg-slate-600"}`}
+                                >
+                                    <span className="material-symbols-outlined text-[20px]">{isCameraOn ? "videocam" : "videocam_off"}</span>
+                                </button>
+
+                                <span className="mx-1 h-6 w-px bg-slate-200 dark:bg-lc-border" />
+
+                                <button
+                                    type="button"
+                                    onClick={() => launchSurface("meet")}
+                                    title="Back to the meeting"
+                                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors ${meetActive ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-lc-bg"}`}
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">{SURFACE_META.meet.icon}</span>
+                                    <span className="hidden sm:inline">{SURFACE_META.meet.label}</span>
+                                </button>
+                                {roundSurfaces.map((surface) => {
+                                    const active = !resumeOpen && activeSurface === surface;
+                                    const meta = SURFACE_META[surface];
+                                    return (
+                                        <button
+                                            key={surface}
+                                            type="button"
+                                            onClick={() => launchSurface(surface)}
+                                            title={meta.label}
+                                            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors ${active ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-lc-bg"}`}
+                                        >
+                                            <span className="material-symbols-outlined text-[18px]">{meta.icon}</span>
+                                            <span className="hidden sm:inline">{meta.label}</span>
+                                        </button>
+                                    );
+                                })}
+
+                                <span className="mx-1 h-6 w-px bg-slate-200 dark:bg-lc-border" />
+
+                                <button
+                                    type="button"
+                                    onClick={() => setResumeOpen((value) => !value)}
+                                    disabled={!hasResume}
+                                    title={hasResume ? "Toggle candidate resume" : "No resume yet"}
+                                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${resumeOpen ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-lc-bg"}`}
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">description</span>
+                                    <span className="hidden sm:inline">Resume</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleRequestScreenShare}
+                                    title="Ask the candidate to share their screen"
+                                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors ${screenLive ? "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-lc-bg"}`}
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">screen_share</span>
+                                    <span className="hidden md:inline">{screenLive ? "Sharing" : "Screen"}</span>
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Headless: transcribe the interviewer's own mic into conversation memory. */}
+                        <SpeechCapture
+                            enabled={speechEnabled}
+                            onTranscript={(text, isFinal) => sendTranscript(text, isFinal, "interviewer")}
+                        />
                     </section>
                 </main>
             </div>

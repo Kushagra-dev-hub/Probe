@@ -25,6 +25,8 @@ import {
   type ScorecardItem,
 } from "@probe/contract";
 import { generateJson, llmConfigured } from "./llm.js";
+import { getBankQuestion } from "./bank.js";
+import { describeDesignScene } from "./excalidraw-serializer.js";
 
 /* ------------------------------------------------------------------ *
  * Runtime state (in-memory, keyed by interviewId).
@@ -84,10 +86,11 @@ const EDITOR_DEBOUNCE_MS = 7_000;
 const MIN_AUTO_INTERVAL_MS = 20_000;
 const MIN_CODE_DELTA_CHARS = 25;
 const MAX_SUGGESTIONS_KEPT = 20;
-/** Endpointing: after this much silence we CONSIDER the answer possibly done… */
-const ANSWER_SILENCE_MS = 4_500;
-/** …but short answers wait longer, since thinking pauses are normal. */
-const SHORT_ANSWER_EXTRA_MS = 3_500;
+/** Endpointing FALLBACK: the interviewer pressing Enter is the primary trigger,
+ *  so the silence timer is long — it only fires if they never mark the answer. */
+const ANSWER_SILENCE_MS = 9_000;
+/** …and short answers wait even longer, since thinking pauses are normal. */
+const SHORT_ANSWER_EXTRA_MS = 5_000;
 const MAX_CONVERSATION_KEPT = 400;
 
 const runtimes = new Map<string, CopilotRuntime>();
@@ -220,21 +223,34 @@ function fallbackRubricItems(roleTitle: string | null): RubricItem[] {
 
 async function loadQuestionContext(interviewId: string, questionRowId: string | null): Promise<QuestionContext | null> {
   if (!questionRowId) return null;
-  const row = await prisma.interviewQuestion.findFirst({
-    where: { id: questionRowId, interviewId },
-    include: { bankQuestion: true },
-  });
+  const row = await prisma.interviewQuestion.findFirst({ where: { id: questionRowId, interviewId } });
   if (!row) return null;
-  const bank = row.bankQuestion;
-  const constraints = bank?.constraints;
-  return {
-    id: row.id,
-    bankQuestionId: row.questionId,
-    title: bank?.title || row.text,
-    statement: bank?.statement || bank?.description || row.text,
-    constraints: Array.isArray(constraints) ? constraints.map(String).join("; ") : constraints ? String(constraints) : "",
-    difficulty: bank?.difficulty || row.difficulty,
-  };
+
+  // questionId is polymorphic: a Mongo bank ObjectId (24-hex) or a Postgres
+  // Question id/slug. Resolve title/statement/constraints from whichever source.
+  let title = row.text;
+  let statement = row.text;
+  let constraintsText = "";
+  let difficulty = row.difficulty;
+  if (row.questionId && /^[0-9a-f]{24}$/i.test(row.questionId)) {
+    const bank = await getBankQuestion(row.questionId).catch(() => null);
+    if (bank) {
+      title = bank.title || title;
+      statement = bank.statement || bank.description || statement;
+      constraintsText = (bank.constraints ?? []).join("; ");
+      difficulty = bank.difficulty || difficulty;
+    }
+  } else if (row.questionId) {
+    const bank = await prisma.question.findUnique({ where: { id: row.questionId } }).catch(() => null);
+    if (bank) {
+      const constraints = bank.constraints;
+      title = bank.title || title;
+      statement = bank.statement || bank.description || statement;
+      constraintsText = Array.isArray(constraints) ? constraints.map(String).join("; ") : constraints ? String(constraints) : "";
+      difficulty = bank.difficulty || difficulty;
+    }
+  }
+  return { id: row.id, bankQuestionId: row.questionId, title, statement, constraints: constraintsText, difficulty };
 }
 
 export async function ensureCopilotRuntime(interviewId: string): Promise<CopilotRuntime | null> {
@@ -270,6 +286,23 @@ export async function ensureCopilotRuntime(interviewId: string): Promise<Copilot
     activeSurface: interview.roomSession?.activeSurface ?? "meet",
     resumeSummary: summarizeResumeAnalysis(interview.resumeAnalysis),
   };
+
+  // Hydrate the latest code/diagram from the DB so the copilot has the current
+  // work even after a server restart or when the interviewer joins mid-session.
+  if (interview.roomSession?.id) {
+    const snapshot = await prisma.roomCodeSnapshot
+      .findFirst({ where: { roomSessionId: interview.roomSession.id }, orderBy: { updatedAt: "desc" } })
+      .catch(() => null);
+    if (snapshot?.code) {
+      runtime.code = {
+        code: snapshot.code,
+        language: snapshot.language,
+        questionId: snapshot.questionId,
+        updatedAt: snapshot.updatedAt.toISOString(),
+      };
+    }
+  }
+
   runtimes.set(interviewId, runtime);
   return runtime;
 }
@@ -416,6 +449,15 @@ export function noteQuestionChange(interviewId: string, questionRowId: string | 
     runtime.question = await loadQuestionContext(interviewId, questionRowId);
     runtime.lastAnalyzedCode = "";
     runtime.executions = [];
+    // Load THIS question's latest code/diagram so the copilot never analyzes the
+    // previous surface's work (e.g. a design scene while now on the DSA IDE).
+    runtime.code = null;
+    if (runtime.roomSessionId && questionRowId) {
+      const snap = await prisma.roomCodeSnapshot
+        .findFirst({ where: { roomSessionId: runtime.roomSessionId, questionId: questionRowId }, orderBy: { updatedAt: "desc" } })
+        .catch(() => null);
+      if (snap?.code) runtime.code = { code: snap.code, language: snap.language, questionId: snap.questionId, updatedAt: snap.updatedAt.toISOString() };
+    }
     emitStatus(runtime, "watching", runtime.question ? `Watching: ${runtime.question.title}` : undefined);
   });
 }
@@ -424,21 +466,22 @@ export function noteQuestionChange(interviewId: string, questionRowId: string | 
  * The live analysis pass → one "ASK THIS NEXT" card.
  * ------------------------------------------------------------------ */
 
-const SUGGESTION_SYSTEM = `You are Probe, a copilot for the human INTERVIEWER in a live coding interview. You read the candidate's actual work and suggest the single best follow-up question to ask next.
+const SUGGESTION_SYSTEM = `You are Probe, a copilot for the human INTERVIEWER in a live technical interview (DSA coding, SQL, or System Design whiteboard). You read the candidate's ACTUAL work for the ACTIVE round and suggest the single best follow-up question to ask next.
 
 ABSOLUTE RULES:
-1. Ground everything in the provided work. Cite the exact line numbers and quote the exact snippet or run output you reacted to. Never invent code, results, or claims.
-2. Suggest exactly ONE question, conversational, under 25 words, that the interviewer can say out loud verbatim.
-3. Describe the WORK, never the person. Say "the nested loop at lines 3-4 is O(n^2)" — never "the candidate is weak". Flag what is ABSENT from the work (no edge-case handling, never ran the code) as an observation, not a judgement.
-4. Tie the suggestion to the single most relevant rubric item via its key. Use null only when nothing fits.
-5. If there is nothing genuinely worth asking right now (code barely changed, still boilerplate/starter code, or your last suggestion already covers it), return {"skip": true, "reason": "..."}.
-6. Never propose revealing the solution or hints for the candidate. The card is for the interviewer's eyes only.
-7. Do not repeat a question that is substantially the same as one of the recent suggestions listed.
+1. Ground everything ONLY in the provided work and the active question. Never invent code, tables, diagram parts, results, or claims. Never answer a question the work does not address.
+2. Stay in the ACTIVE ROUND. For DSA cite line numbers + a short code snippet. For SQL cite the query clause. For System Design cite component/connection NAMES (e.g. "the API Server has no queue before the database"). The evidence field must be a SHORT, HUMAN-READABLE quote — a line of code, a clause, or a component name. NEVER paste raw JSON, element ids, coordinates, or serialized data into evidence.
+3. Suggest exactly ONE question, conversational, under 25 words, that the interviewer can say out loud verbatim. It must be answerable from the candidate's current work/round.
+4. Describe the WORK, never the person ("the nested loop at lines 3-4 is O(n^2)", not "the candidate is weak"). Flagging what is ABSENT (no index, no queue, never ran it) is an observation, not a judgement.
+5. Tie the suggestion to the single most relevant rubric item via its key. null only when nothing fits.
+6. If there's nothing genuinely worth asking yet (still starter/boilerplate, empty diagram, barely changed, or your last suggestion already covers it), return {"skip": true, "reason": "..."}.
+7. Never propose revealing the solution/hints to the candidate. The card is interviewer-only.
+8. Do not repeat a question substantially the same as a recent one listed.
 
 Return STRICT JSON, one of:
 {"skip": true, "reason": "..."}
 or
-{"skip": false, "surface": "ide"|"runs", "observation": "...", "evidence": "exact quoted snippet or output", "evidenceLines": "lines X-Y" or null, "ask": "...", "rubricKey": "..." or null, "confidence": "low"|"medium"|"high"}`;
+{"skip": false, "surface": "ide"|"runs"|"question", "observation": "...", "evidence": "short human-readable snippet/clause/component — never JSON", "evidenceLines": "lines X-Y" or null, "ask": "...", "rubricKey": "..." or null, "confidence": "low"|"medium"|"high"}`;
 
 function numberedCode(code: string): string {
   return code
@@ -473,17 +516,36 @@ export async function analyze(interviewId: string, trigger: CopilotTrigger): Pro
     const rubric = runtime.rubric ?? (await getRubric(interviewId));
     if (rubric) runtime.rubric = rubric;
 
+    // Describe the candidate's WORK based on the active surface. Derive it from the
+    // code's own language first (a design scene is Excalidraw JSON regardless of the
+    // room surface) so we never render a diagram as line-numbered code.
+    const codeLang = runtime.code?.language;
+    const surface = codeLang === "design" ? "design" : codeLang === "sql" ? "sql" : runtime.activeSurface;
+    let workBlock: string;
+    if (surface === "design") {
+      workBlock = code.trim()
+        ? `CANDIDATE'S SYSTEM-DESIGN DIAGRAM (components, connections, zones):\n${describeDesignScene(code).slice(0, 6000)}`
+        : "CANDIDATE'S SYSTEM-DESIGN DIAGRAM: (the whiteboard is empty)";
+    } else if (surface === "sql") {
+      workBlock = code.trim()
+        ? `CANDIDATE'S SQL QUERY (live in the editor):\n${code.slice(0, 4000)}`
+        : "CANDIDATE'S SQL QUERY: (editor is empty)";
+    } else {
+      workBlock = code.trim()
+        ? `CANDIDATE'S CURRENT CODE (${runtime.code?.language || "unknown"}, live in the editor, line-numbered):\n${numberedCode(code).slice(0, 6000)}`
+        : "CANDIDATE'S CURRENT CODE: (editor is empty)";
+    }
+
     const recent = runtime.suggestions.slice(-4).map((s) => `- ${s.ask}`);
     const user = [
       rubric
         ? `ROLE RUBRIC (${rubric.roleTitle || "unspecified role"}):\n${rubric.items.map((i) => `- [${i.key}] ${i.title}: ${i.description} Weak: ${i.weakSignal} Strong: ${i.strongSignal}`).join("\n")}`
         : "ROLE RUBRIC: (none — use general strong-engineer expectations)",
+      `ACTIVE ROUND: ${surface === "design" ? "System Design (whiteboard)" : surface === "sql" ? "SQL" : "DSA / coding"}`,
       runtime.question
         ? `ACTIVE QUESTION: ${runtime.question.title}${runtime.question.difficulty ? ` (${runtime.question.difficulty})` : ""}\n${runtime.question.statement.slice(0, 2000)}${runtime.question.constraints ? `\nConstraints: ${runtime.question.constraints}` : ""}`
         : "ACTIVE QUESTION: (not shared yet)",
-      code.trim()
-        ? `CANDIDATE'S CURRENT CODE (${runtime.code?.language || "unknown"}, live in the editor, line-numbered):\n${numberedCode(code).slice(0, 6000)}`
-        : "CANDIDATE'S CURRENT CODE: (editor is empty)",
+      workBlock,
       runtime.executions.length
         ? `RECENT RUNS (newest last):\n${runtime.executions.map((e) => `- [${e.at}] ${e.summary}`).join("\n")}`
         : "RECENT RUNS: none — the candidate has not run the code yet.",
@@ -747,7 +809,7 @@ export function noteTranscript(interviewId: string, entry: { speaker: "interview
   });
 }
 
-function finalizeAnswer(runtime: CopilotRuntime, reason: "silence" | "interviewer-spoke") {
+function finalizeAnswer(runtime: CopilotRuntime, reason: "silence" | "interviewer-spoke" | "interviewer-marked") {
   if (runtime.answerTimer) {
     clearTimeout(runtime.answerTimer);
     runtime.answerTimer = null;
@@ -757,9 +819,22 @@ function finalizeAnswer(runtime: CopilotRuntime, reason: "silence" | "interviewe
     .join(" ")
     .trim();
   runtime.pendingAnswer = [];
-  // Too short to be an answer worth analyzing (acknowledgements, "yes", fillers).
-  if (!answer || answer.split(/\s+/).length < 8) return;
+  // Too short to be an answer worth analyzing. The interviewer explicitly marking
+  // an answer complete lowers the bar (they know it's done).
+  const minWords = reason === "interviewer-marked" ? 3 : 8;
+  if (!answer || answer.split(/\s+/).length < minWords) return;
   void analyzeCompletedAnswer(runtime, answer, reason).catch(() => {});
+}
+
+/**
+ * The interviewer pressed Enter to mark the candidate's current answer complete.
+ * Endpoint detection in live interviews is unreliable (candidates pause to think),
+ * so this manual trigger is the primary path; the silence timer is a fallback.
+ */
+export function forceFinalizeAnswer(interviewId: string) {
+  const runtime = runtimes.get(interviewId);
+  if (!runtime) return;
+  finalizeAnswer(runtime, "interviewer-marked");
 }
 
 const INSIGHT_SYSTEM = `You are Probe, a live copilot for the human INTERVIEWER in a technical interview. A candidate just finished (or paused for a long time during) a spoken answer. You must analyze that answer for the interviewer.
@@ -794,7 +869,7 @@ async function analyzeCompletedAnswer(runtime: CopilotRuntime, answer: string, r
       runtime.executions.length ? `RECENT RUNS:\n${runtime.executions.map((e) => `- ${e.summary}`).join("\n")}` : "",
       `RECENT CONVERSATION:\n${recentConversation}`,
       `QUESTION BEING ANSWERED (best guess): ${runtime.lastInterviewerQuestion || "(unknown — infer from conversation)"}`,
-      `THE COMPLETED ANSWER (ended by ${reason === "silence" ? "a long pause" : "the interviewer speaking"}):\n"""${answer.slice(0, 3000)}"""`,
+      `THE COMPLETED ANSWER (${reason === "silence" ? "ended after a long pause" : reason === "interviewer-marked" ? "the interviewer marked this answer complete" : "ended when the interviewer spoke"}):\n"""${answer.slice(0, 3000)}"""`,
       "Analyze now.",
     ]
       .filter(Boolean)
@@ -914,7 +989,20 @@ export async function analyzeResume(interviewId: string): Promise<ResumeAnalysis
   return analysis;
 }
 
-/** Insight history for interviewer room hydration. */
-export function getRecentInsights(interviewId: string): CopilotInsight[] {
-  return runtimes.get(interviewId)?.insights.slice(-15) ?? [];
+/** Insight history for interviewer room hydration (falls back to the audit log
+ *  so a reloaded interviewer still sees answers analyzed before a server restart). */
+export async function getRecentInsights(interviewId: string): Promise<CopilotInsight[]> {
+  const live = runtimes.get(interviewId)?.insights;
+  if (live?.length) return live.slice(-15);
+  const session = await prisma.roomSession.findUnique({ where: { interviewId } });
+  if (!session) return [];
+  const events = await prisma.roomEvent.findMany({
+    where: { roomSessionId: session.id, eventType: "copilot_insight" },
+    orderBy: { createdAt: "desc" },
+    take: 15,
+  });
+  return events
+    .map((e) => e.payload as unknown as CopilotInsight)
+    .filter((i) => i && typeof i === "object" && typeof i.summary === "string")
+    .reverse();
 }

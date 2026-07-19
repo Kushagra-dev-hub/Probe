@@ -371,6 +371,11 @@ export function useInterviewRoom(identifier: string) {
         });
     }, []);
 
+    // Interviewer marks the candidate's current answer complete → copilot analyzes it now.
+    const analyzeAnswer = useCallback(() => {
+        socketRef.current?.emit("direct:analyze-answer", { interviewId: identifierRef.current });
+    }, []);
+
     const seedCopilotState = useCallback((state: { suggestions?: CopilotSuggestion[]; scorecard?: CopilotScorecard | null; insights?: CopilotInsight[]; resumeAnalysis?: ResumeAnalysis | null }) => {
         if (state.suggestions?.length) {
             setCopilotSuggestions((list) => {
@@ -458,6 +463,7 @@ export function useInterviewRoom(identifier: string) {
         seedCopilotState,
         changeSurface,
         sendTranscript,
+        analyzeAnswer,
         reload: join,
     };
 }

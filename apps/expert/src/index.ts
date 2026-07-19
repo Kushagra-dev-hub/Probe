@@ -21,7 +21,7 @@ import { executePlainCode, executeAgainstTests, executeSql, extractSampleTests }
 import { listBankQuestions, getBankQuestion, pickRandomBankQuestions, type BankRound } from "./lib/bank.js";
 import { createRequire } from "node:module";
 import { mkdirSync, createWriteStream } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { writeFile, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import multipart from "@fastify/multipart";
 import {
@@ -37,6 +37,7 @@ import {
   noteQuestionChange,
   noteSurfaceChange,
   noteTranscript,
+  forceFinalizeAnswer,
   analyzeResume,
   getRecentInsights,
 } from "./lib/copilot.js";
@@ -517,16 +518,17 @@ app.get<{ Params: { id: string } }>("/interviews/:id/copilot", async (req, reply
   if (!interview) return reply.code(404).send({ message: "Interview not found." });
   if (interview.interviewerId !== authed.id) return reply.code(403).send({ message: "Copilot data is interviewer-only." });
 
-  const [rubric, suggestions, scorecard] = await Promise.all([
+  const [rubric, suggestions, scorecard, insights] = await Promise.all([
     getRubric(interview.id),
     getRecentSuggestions(interview.id),
     getScorecard(interview.id),
+    getRecentInsights(interview.id),
   ]);
   return {
     rubric,
     suggestions,
     scorecard,
-    insights: getRecentInsights(interview.id),
+    insights,
     resumeAnalysis: interview.resumeAnalysis ?? null,
     resume: interview.resumeFileName ? { fileName: interview.resumeFileName, uploadedAt: interview.resumeUploadedAt?.toISOString() ?? null } : null,
   };
@@ -546,6 +548,41 @@ app.get<{ Params: { id: string } }>("/interviews/:id/resume", async (req, reply)
     text: interview.resumeText,
     analysis: interview.resumeAnalysis ?? null,
   };
+});
+
+// Stream the actual uploaded resume file so the interviewer can view the real PDF
+// (native browser PDF viewer via a blob URL on the client). Interviewer-only.
+app.get<{ Params: { id: string } }>("/interviews/:id/resume/file", async (req, reply) => {
+  const authed = await requireUser(req, reply);
+  if (!authed) return;
+  const interview = await prisma.interview.findUnique({ where: { id: req.params.id } });
+  if (!interview) return reply.code(404).send({ message: "Interview not found." });
+  if (interview.interviewerId !== authed.id) return reply.code(403).send({ message: "The resume is interviewer-only." });
+
+  const files = (await readdir(UPLOAD_DIR).catch(() => [])).filter((f) => f.startsWith(`${interview.id}-`));
+  if (files.length === 0) return reply.code(404).send({ message: "No resume file on disk." });
+  // safeName = `${id}-${Date.now()}-${name}`; the 13-digit timestamp sorts chronologically.
+  files.sort();
+  const latest = files[files.length - 1];
+  const buffer = await readFile(path.join(UPLOAD_DIR, latest));
+  const isPdf = latest.toLowerCase().endsWith(".pdf");
+  reply
+    .type(isPdf ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    .header("Content-Disposition", `inline; filename="${interview.resumeFileName || latest}"`);
+  return reply.send(buffer);
+});
+
+// Fallback: the room calls this when the interviewer opens a resume that has no
+// analysis yet (analysis normally runs automatically on upload). Interviewer-only.
+app.post<{ Params: { id: string } }>("/interviews/:id/resume/analyze", async (req, reply) => {
+  const authed = await requireUser(req, reply);
+  if (!authed) return;
+  const interview = await prisma.interview.findUnique({ where: { id: req.params.id } });
+  if (!interview) return reply.code(404).send({ message: "Interview not found." });
+  if (interview.interviewerId !== authed.id) return reply.code(403).send({ message: "The resume is interviewer-only." });
+  if (!interview.resumeText) return reply.code(404).send({ message: "No resume uploaded yet." });
+  const analysis = await analyzeResume(interview.id).catch(() => null);
+  return { ok: Boolean(analysis), analysis };
 });
 
 // (Re)generate the role pack from a role title + JD.
@@ -938,25 +975,32 @@ io.on("connection", (socket) => {
       let sampleTests: ReturnType<typeof extractSampleTests> = [];
       let wrapper: string | null = null;
       let sqlMeta: { wrapperCode: string } | null = null;
+      let sqlSolution: string | null = null;
       if (!p.stdin && base.questionId) {
         const questionRow = await prisma.interviewQuestion.findFirst({
           where: { id: base.questionId, interviewId: p.interviewId },
-          include: { bankQuestion: { select: { sampleTests: true } } },
         });
-        sampleTests = extractSampleTests(questionRow?.bankQuestion?.sampleTests);
+        // Postgres seed/bank question: sampleTests live on the Question table
+        // (questionId is a non-hex uuid/slug). Look it up separately — no FK relation.
+        if (questionRow?.questionId && !/^[0-9a-f]{24}$/i.test(questionRow.questionId)) {
+          const pgQuestion = await prisma.question.findUnique({ where: { id: questionRow.questionId }, select: { sampleTests: true } });
+          sampleTests = extractSampleTests(pgQuestion?.sampleTests);
+        }
         if (sampleTests.length === 0 && questionRow?.questionId && /^[0-9a-f]{24}$/i.test(questionRow.questionId)) {
           const bankQuestion = await getBankQuestion(questionRow.questionId);
           if (bankQuestion) {
             sampleTests = extractSampleTests(bankQuestion.sample_tests);
             wrapper = bankQuestion.wrappers[p.language] ?? bankQuestion.wrappers[p.language === "python" ? "python3" : p.language] ?? null;
             if (bankQuestion.sqlMeta) sqlMeta = { wrapperCode: bankQuestion.sqlMeta.wrapperCode };
+            const sol = bankQuestion.solution;
+            sqlSolution = typeof sol === "string" ? sol : (sol && typeof sol === "object" ? String((sol as Record<string, unknown>).sqlite ?? (sol as Record<string, unknown>).sql ?? "") : null);
           }
         }
       }
 
       let result: NonNullable<ExecutionState["result"]>;
       if (sqlMeta || p.language === "sql") {
-        const sqlRun = await executeSql({ query: p.code, wrapperCode: sqlMeta?.wrapperCode ?? "", tests: sampleTests });
+        const sqlRun = await executeSql({ query: p.code, wrapperCode: sqlMeta?.wrapperCode ?? "", tests: sampleTests, solution: sqlSolution });
         result = {
           statusId: sqlRun.result.statusId,
           status:
@@ -984,6 +1028,8 @@ io.on("connection", (socket) => {
           tests: sqlRun.tests,
           passedCount: sqlRun.totalCount > 0 ? sqlRun.passedCount : null,
           totalCount: sqlRun.totalCount > 0 ? sqlRun.totalCount : null,
+          table: sqlRun.table,
+          expectedTable: sqlRun.expectedTable,
         };
       } else if (sampleTests.length > 0) {
         const testRun = await executeAgainstTests({ code: p.code, language: p.language, tests: sampleTests, wrapper });
@@ -1077,6 +1123,13 @@ io.on("connection", (socket) => {
       })
       .catch(() => {});
     if (entry.isFinal) noteTranscript(p.interviewId, { speaker, text: entry.text, at: entry.at });
+  });
+
+  // Interviewer pressed Enter → analyze the candidate's current answer immediately.
+  socket.on("direct:analyze-answer", ({ interviewId }, ack) => {
+    if (socket.data.role !== "interviewer") return ack?.({ ok: false, message: "Interviewer-only." });
+    forceFinalizeAnswer(interviewId);
+    ack?.({ ok: true });
   });
 
   /* --- Probe copilot (interviewer-only) --- */

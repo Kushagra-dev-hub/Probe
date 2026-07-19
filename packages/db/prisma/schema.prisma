@@ -130,7 +130,9 @@ model CopilotScorecard {
   @@map("copilot_scorecards")
 }
 
-/// A question attached to an interview (may reference a bank question or be inline).
+/// A question attached to an interview. `questionId` is polymorphic: it holds
+/// either a Postgres Question.id (seed bank) OR a Mongo bank ObjectId (24-hex),
+/// so it is intentionally NOT a foreign key.
 model InterviewQuestion {
   id          String   @id @default(uuid())
   interviewId String   @map("interview_id")
@@ -144,7 +146,6 @@ model InterviewQuestion {
   createdAt   DateTime @default(now()) @map("created_at")
 
   interview Interview      @relation(fields: [interviewId], references: [id], onDelete: Cascade)
-  bankQuestion Question?   @relation(fields: [questionId], references: [id])
 
   @@index([interviewId])
   @@map("interview_questions")
@@ -167,8 +168,6 @@ model Question {
   sampleTests Json?    @map("sample_tests")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
-
-  interviewQuestions InterviewQuestion[]
 
   @@map("questions")
 }
