@@ -312,31 +312,62 @@ export async function executeSql(input: {
   if (input.solution?.trim()) {
     try {
       const solResult = await submitRaw(buildSqlScript(input.wrapperCode, input.solution), SQLITE_LANGUAGE_ID);
-      if (solResult.statusId === 3 && solResult.stdout) {
-        expectedNormalized = normalizeSqlOutput(solResult.stdout);
-        expectedTable = parseSqlTable(solResult.stdout);
+      // statusId 3 = ran clean. An empty result set (null/"" stdout) is a valid
+      // expected output — treat it as "" so it compares equal to an empty query result.
+      if (solResult.statusId === 3) {
+        expectedNormalized = normalizeSqlOutput(solResult.stdout ?? "");
+        expectedTable = parseSqlTable(solResult.stdout ?? "");
       }
     } catch {
       /* fall back to stored expected */
     }
   }
 
-  const tests: TestCaseOutcome[] = input.tests.map((test, index) => {
+  const tests: TestCaseOutcome[] = [];
+  for (let index = 0; index < input.tests.length; index += 1) {
+    const test = input.tests[index];
+    if (test.wrapperCode?.trim()) {
+      // Hidden case: run the query — and, when available, the reference solution —
+      // against THIS case's own dataset, then compare. Each case is independent.
+      const caseResult = await submitRaw(buildSqlScript(test.wrapperCode, input.query), SQLITE_LANGUAGE_ID);
+      let caseExpected = normalizeSqlOutput(test.expectedOutput);
+      if (input.solution?.trim()) {
+        try {
+          const solCase = await submitRaw(buildSqlScript(test.wrapperCode, input.solution), SQLITE_LANGUAGE_ID);
+          if (solCase.statusId === 3) caseExpected = normalizeSqlOutput(solCase.stdout ?? "");
+        } catch {
+          /* fall back to stored expected */
+        }
+      }
+      tests.push({
+        id: test.id,
+        index,
+        passed: caseResult.statusId === 3 && normalizeSqlOutput(caseResult.stdout) === caseExpected,
+        status: caseResult.status,
+        stdin: test.label || test.stdin,
+        expectedOutput: test.expectedOutput,
+        actualOutput: caseResult.stdout,
+        stderr: caseResult.stderr,
+        compileOutput: caseResult.compileOutput,
+        time: caseResult.time,
+      });
+      continue;
+    }
+    // Shared-dataset case (samples): compare against the primary run.
     const expected = expectedNormalized ?? normalizeSqlOutput(test.expectedOutput);
-    const passed = result.statusId === 3 && normalizeSqlOutput(result.stdout) === expected;
-    return {
+    tests.push({
       id: test.id,
       index,
-      passed,
+      passed: result.statusId === 3 && normalizeSqlOutput(result.stdout) === expected,
       status: result.status,
-      stdin: test.stdin,
+      stdin: test.label || test.stdin,
       expectedOutput: test.expectedOutput,
       actualOutput: result.stdout,
       stderr: result.stderr,
       compileOutput: result.compileOutput,
       time: result.time,
-    };
-  });
+    });
+  }
 
   return {
     result,
@@ -358,6 +389,10 @@ export type SampleTest = {
   id: string;
   stdin: string;
   expectedOutput: string;
+  /** SQL only: this case's own dataset (DDL/DML). Hidden SQL cases each ship one. */
+  wrapperCode?: string;
+  /** Human label for the case (SQL hidden cases carry a description). */
+  label?: string;
 };
 
 export type TestCaseOutcome = {
@@ -398,10 +433,14 @@ export function extractSampleTests(raw: unknown): SampleTest[] {
       const test = entry as Record<string, unknown>;
       const stdin = test.stdin ?? test.input ?? "";
       const expected = test.expected_output ?? test.expectedOutput ?? test.output ?? "";
+      const wrapperCode = test.wrapperCode ?? test.wrapper_code;
+      const label = test.label ?? test.description;
       return {
         id: String(test.id ?? `t${index + 1}`),
         stdin: typeof stdin === "string" ? stdin : JSON.stringify(stdin),
         expectedOutput: typeof expected === "string" ? expected : JSON.stringify(expected),
+        ...(typeof wrapperCode === "string" && wrapperCode.trim() ? { wrapperCode } : {}),
+        ...(typeof label === "string" && label.trim() ? { label } : {}),
       };
     })
     .filter((t): t is SampleTest => t !== null);
@@ -409,13 +448,16 @@ export function extractSampleTests(raw: unknown): SampleTest[] {
 
 /**
  * Compose the runnable source. Mongo DSA questions ship a per-language
- * `wrapper_code` harness (reads stdin, calls the user's function); the user's
- * buffer replaces a {{USER_CODE}} placeholder when present, else prefixes it.
+ * `wrapper_code` harness (reads stdin, calls the user's function). The harness
+ * marks the injection point with a placeholder: the practers bank uses
+ * `<USER_CODE>` (global), our own seed bank uses `{{USER_CODE}}`. Replace
+ * whichever is present; if the harness has no placeholder, prefix the user code.
  */
 function composeSource(code: string, wrapper?: string | null): string {
   const harness = (wrapper || "").trim();
   if (!harness) return code;
-  if (harness.includes("{{USER_CODE}}")) return harness.replace("{{USER_CODE}}", code);
+  if (harness.includes("<USER_CODE>")) return harness.replace(/<USER_CODE>/g, code);
+  if (harness.includes("{{USER_CODE}}")) return harness.replace(/\{\{USER_CODE\}\}/g, code);
   return `${code}\n\n${harness}`;
 }
 

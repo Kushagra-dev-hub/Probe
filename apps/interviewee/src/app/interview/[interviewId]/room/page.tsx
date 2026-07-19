@@ -440,8 +440,13 @@ function CandidateRoom() {
         };
         const byActiveId = questions.find((question) => question.id === activeQuestionId);
         if (byActiveId && matches(byActiveId)) return byActiveId;
-        return questions.find(matches) || byActiveId || questions[roomState?.activeQuestionIndex || bootstrap?.activeQuestionIndex || 0] || questions[0];
-    }, [activeQuestionId, bootstrap?.activeQuestionIndex, isMeet, questions, roomState?.activeQuestionIndex, surface]);
+        // Only ever surface a question that belongs to the ACTIVE surface. Falling back
+        // to a wrong-surface question is what let a design/DSA question (and its editor
+        // contents — e.g. Excalidraw JSON) bleed into the SQL/DSA panels. If this round
+        // has no matching question, return null so the panel shows a clean empty state
+        // and the editor resets instead of leaking the previous surface's code.
+        return questions.find(matches) || null;
+    }, [activeQuestionId, isMeet, questions, surface]);
     const questionLookupId = getQuestionLookupId(activeQuestion);
     const questionCacheKey = `${bootstrap?.directInterviewId || ""}:${questionLookupId || ""}`;
     const testCasesToDisplay = questionDetails?.sample_tests || [];
@@ -457,13 +462,13 @@ function CandidateRoom() {
     }, [admittedAt, sessionEnded]);
     const runningElapsed = admittedAt ? Math.max(0, Math.floor((nowTs - new Date(admittedAt).getTime()) / 1000)) : 0;
     const activeEditorState = useMemo(() => {
-        if (!editorState) return null;
-        if (activeQuestion?.id && editorState.questionId !== activeQuestion.id) return null;
+        if (!editorState || !activeQuestion?.id) return null;
+        if (editorState.questionId !== activeQuestion.id) return null;
         return editorState;
     }, [activeQuestion?.id, editorState]);
     const activeExecutionState = useMemo(() => {
-        if (!executionState) return null;
-        if (activeQuestion?.id && executionState.questionId !== activeQuestion.id) return null;
+        if (!executionState || !activeQuestion?.id) return null;
+        if (executionState.questionId !== activeQuestion.id) return null;
         return executionState;
     }, [activeQuestion?.id, executionState]);
     const executionRunning = activeExecutionState?.phase === "running";
@@ -1295,7 +1300,13 @@ function CandidateRoom() {
                             </div>
 
                             <div className="min-h-0 flex-1">
-                                {isDesign ? (
+                                {!activeQuestion ? (
+                                    <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+                                        <span className="material-symbols-outlined text-[36px] text-slate-300 dark:text-slate-600">quiz</span>
+                                        <p className="text-sm font-bold text-slate-600 dark:text-slate-300">No {surface === "sql" ? "SQL" : surface === "design" ? "System Design" : "DSA"} question in this interview</p>
+                                        <p className="text-xs text-slate-400">The interviewer will open a different round.</p>
+                                    </div>
+                                ) : isDesign ? (
                                     <DesignBoard value={code} readOnly={false} onChange={handleDesignChange} theme="light" />
                                 ) : (
                                     <MonacoEditor key={`${activeQuestion?.id || "question"}:${language}`} height="100%" language={monacoLanguage(language)} defaultValue={code} onMount={(editor) => { mainEditorRef.current = editor; if (code && editor.getValue() !== code) editor.setValue(code); }} onChange={(value) => updateCode(value || "")} theme="light" options={{ minimap: { enabled: false }, fontSize: 14, readOnly: Boolean(sessionEnded), wordWrap: "on", automaticLayout: true, scrollBeyondLastLine: false }} />

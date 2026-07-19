@@ -133,11 +133,57 @@ export type BankQuestionDetail = {
   hints: string[];
   solution: unknown;
   sample_tests: Array<{ id: string; stdin: string; expected_output: string }>;
+  /** Full graded set (Submit): DSA cases share the harness; SQL cases carry their own dataset. */
+  hidden_tests: Array<{ id: string; stdin: string; expected_output: string; wrapperCode?: string; label?: string }>;
   /** Per-language wrapper harnesses for DSA execution. */
   wrappers: Record<string, string>;
   sqlMeta: { wrapperCode: string; schemaText: string } | null;
-  designMeta: { rubricLite: unknown; followUpQuestions: string[] } | null;
+  designMeta: DesignMeta | null;
 };
+
+/** Rich system-design metadata — the interviewer's evaluation guide (practers parity). */
+export type DesignMeta = {
+  functionalRequirements: string[];
+  nonFunctionalRequirements: string[];
+  scale: string[];
+  requiredComponents: string[];
+  keyTradeoffs: string[];
+  antiPatterns: string[];
+  scoringDimensions: Array<{ name: string; weight: number; criteria: string }>;
+  sampleAnswer: string;
+  followUpQuestions: string[];
+  sampleDiagramUrl: string | null;
+};
+
+/**
+ * Pull the `**Functional Requirements:** / **Non-Functional Requirements:** / **Scale:**`
+ * bullet sections out of a system-design problem statement (they're authored as markdown).
+ */
+function parseRequirementSections(statement: string): { fr: string[]; nfr: string[]; scale: string[] } {
+  const out = { fr: [] as string[], nfr: [] as string[], scale: [] as string[] };
+  if (!statement) return out;
+  const headingRe = /\*\*\s*(Functional Requirements|Non-Functional Requirements|Scale)\s*:?\s*\*\*/gi;
+  // split() with a capturing group yields: [pre, label1, body1, label2, body2, ...]
+  const parts = statement.split(headingRe);
+  for (let i = 1; i < parts.length; i += 2) {
+    const label = (parts[i] || "").toLowerCase();
+    const body = parts[i + 1] || "";
+    const bucket = label.startsWith("functional") ? out.fr : label.startsWith("non-functional") ? out.nfr : out.scale;
+    // Keep the leading bullet list only; stop at the first blank line after content.
+    let started = false;
+    for (const rawLine of body.split("\n")) {
+      const line = rawLine.replace(/^\s*[-*•]\s*/, "").trim();
+      if (!line) {
+        if (started) break;
+        continue;
+      }
+      if (/^\*\*/.test(line)) break; // next heading
+      bucket.push(line);
+      started = true;
+    }
+  }
+  return out;
+}
 
 export async function getBankQuestion(id: string): Promise<BankQuestionDetail | null> {
   const db = await getDb();
@@ -172,6 +218,14 @@ export async function getBankQuestion(id: string): Promise<BankQuestionDetail | 
               id: asString(t?.id) || `t${i + 1}`,
               stdin: asString(t?.input),
               expected_output: asString(t?.output),
+            }))
+          : [],
+        hidden_tests: Array.isArray(doc.hiddenTestCases)
+          ? doc.hiddenTestCases.map((t: { id?: unknown; input?: unknown; output?: unknown; description?: unknown }, i: number) => ({
+              id: asString(t?.id) || `h${i + 1}`,
+              stdin: asString(t?.input),
+              expected_output: asString(t?.output),
+              label: t?.description ? asString(t.description) : undefined,
             }))
           : [],
         wrappers,
@@ -211,6 +265,15 @@ export async function getBankQuestion(id: string): Promise<BankQuestionDetail | 
               expected_output: asString(t?.expected_output),
             }))
           : [],
+        hidden_tests: Array.isArray(doc.hiddenTestCases)
+          ? doc.hiddenTestCases.map((t: { id?: unknown; label?: unknown; expected_output?: unknown; wrapper_code?: unknown }, i: number) => ({
+              id: asString(t?.id) || `h${i + 1}`,
+              stdin: asString(t?.label) || `Hidden case ${i + 1}`,
+              label: asString(t?.label) || `Hidden case ${i + 1}`,
+              expected_output: asString(t?.expected_output),
+              wrapperCode: asString(t?.wrapper_code),
+            }))
+          : [],
         wrappers: {},
         sqlMeta: { wrapperCode: asString(doc.wrapperCode), schemaText },
         designMeta: null,
@@ -218,13 +281,27 @@ export async function getBankQuestion(id: string): Promise<BankQuestionDetail | 
     }
 
     // round === "design"
-    const rubricFull = (doc.rubricFull ?? {}) as { sampleAnswer?: unknown };
+    const problemStatement = asString(doc.problemStatement);
+    const rubricFull = (doc.rubricFull ?? {}) as { sampleAnswer?: unknown; scoringDimensions?: unknown };
+    const rubricLite = (doc.rubricLite ?? {}) as {
+      requiredComponents?: unknown;
+      keyTradeoffs?: unknown;
+      antiPatterns?: unknown;
+    };
+    const req = parseRequirementSections(problemStatement);
+    const scoringDimensions = Array.isArray(rubricFull.scoringDimensions)
+      ? (rubricFull.scoringDimensions as Array<Record<string, unknown>>).map((d) => ({
+          name: asString(d?.name),
+          weight: Number(d?.weight) || 0,
+          criteria: asString(d?.criteria),
+        }))
+      : [];
     return {
       id,
       round,
       title: asString(doc.title),
-      statement: asString(doc.problemStatement),
-      description: asString(doc.problemStatement),
+      statement: problemStatement,
+      description: problemStatement,
       difficulty: doc.difficulty ? String(doc.difficulty).toLowerCase() : null,
       language: "markdown",
       examples: [],
@@ -235,11 +312,20 @@ export async function getBankQuestion(id: string): Promise<BankQuestionDetail | 
       hints: Array.isArray(doc.hints) ? doc.hints.map(asString) : [],
       solution: rubricFull.sampleAnswer ? { explanation: asString(rubricFull.sampleAnswer) } : null,
       sample_tests: [],
+      hidden_tests: [],
       wrappers: {},
       sqlMeta: null,
       designMeta: {
-        rubricLite: doc.rubricLite ?? null,
+        functionalRequirements: req.fr,
+        nonFunctionalRequirements: req.nfr,
+        scale: req.scale,
+        requiredComponents: Array.isArray(rubricLite.requiredComponents) ? rubricLite.requiredComponents.map(asString) : [],
+        keyTradeoffs: Array.isArray(rubricLite.keyTradeoffs) ? rubricLite.keyTradeoffs.map(asString) : [],
+        antiPatterns: Array.isArray(rubricLite.antiPatterns) ? rubricLite.antiPatterns.map(asString) : [],
+        scoringDimensions,
+        sampleAnswer: asString(rubricFull.sampleAnswer),
         followUpQuestions: Array.isArray(doc.followUpQuestions) ? doc.followUpQuestions.map(asString) : [],
+        sampleDiagramUrl: doc.sampleDiagramUrl ? asString(doc.sampleDiagramUrl) : null,
       },
     };
   }

@@ -73,39 +73,18 @@ export type ResourcesResponse = {
   questions: { id: string; title: string; difficulty: string | null; language: string | null }[];
 };
 
-/**
- * Readiness + join window (ports the reference `isReady` / `canJoinDirectInterview`):
- * joinable when it has a schedule + at least one question, and we're within a window
- * around `scheduledAt` (from 10 min before, up to the scheduled end).
- */
-export function interviewReadiness(i: InterviewSummary, now = Date.now()) {
+/** Joinable anytime the interview has questions and hasn't ended (no time window). */
+export function interviewReadiness(i: InterviewSummary, _now = Date.now()) {
   const hasSchedule = Boolean(i.scheduledAt);
   const hasQuestion = i.questionCount > 0;
-  const ready = hasSchedule && hasQuestion;
   const isTerminal = i.status === "completed" || i.status === "cancelled" || i.status === "no_show";
 
-  let withinWindow = false;
-  if (i.scheduledAt) {
-    const start = new Date(i.scheduledAt).getTime();
-    const openFrom = start - 10 * 60 * 1000;
-    const openUntil = start + (i.durationMinutes + 30) * 60 * 1000;
-    withinWindow = now >= openFrom && now <= openUntil;
-  }
-
   return {
-    ready,
+    ready: hasQuestion,
     hasSchedule,
     hasQuestion,
     isTerminal,
-    canJoin: ready && withinWindow && !isTerminal,
-    reason: !hasSchedule
-      ? "Schedule the interview first"
-      : !hasQuestion
-        ? "Add at least one question"
-        : isTerminal
-          ? "This interview has ended"
-          : !withinWindow
-            ? "Join opens 10 min before the start"
-            : "",
+    canJoin: hasQuestion && !isTerminal,
+    reason: !hasQuestion ? "No questions attached yet" : isTerminal ? "This interview has ended" : "",
   };
 }
