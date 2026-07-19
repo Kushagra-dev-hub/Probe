@@ -31,6 +31,7 @@ export const api = {
     request<T>(path, token, { method: "POST", body: JSON.stringify(body) }),
   patch: <T>(path: string, body: unknown, token?: string) =>
     request<T>(path, token, { method: "PATCH", body: JSON.stringify(body) }),
+  del: <T>(path: string, token?: string) => request<T>(path, token, { method: "DELETE" }),
 };
 
 /* ------------------------------------------------------------------ *
@@ -46,6 +47,8 @@ export type Me = {
   username: string | null;
 };
 
+export type InterviewRound = "dsa" | "sql" | "design";
+
 export type InterviewSummary = {
   id: string;
   status: string;
@@ -54,6 +57,12 @@ export type InterviewSummary = {
   durationMinutes: number;
   startedAt: string | null;
   endedAt: string | null;
+  rounds: InterviewRound[];
+  shareToken: string;
+  companyName: string | null;
+  roleTitle: string | null;
+  experienceLevel: string | null;
+  resume: { fileName: string; uploadedAt: string } | null;
   interviewerNotes: string | null;
   candidateInstructions: string | null;
   interviewer: { id: string; name: string; email: string | null };

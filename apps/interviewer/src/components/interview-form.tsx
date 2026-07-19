@@ -33,6 +33,8 @@ export function InterviewForm({ existing }: Props) {
   const [durationMinutes, setDurationMinutes] = useState(existing?.durationMinutes ?? 60);
   const [notes, setNotes] = useState(existing?.interviewerNotes ?? "");
   const [candidateInstructions, setCandidateInstructions] = useState(existing?.candidateInstructions ?? "");
+  const [roleTitle, setRoleTitle] = useState("");
+  const [jdText, setJdText] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +46,18 @@ export function InterviewForm({ existing }: Props) {
       .then(setResources)
       .catch((e: Error) => setLoadError(e.message));
   }, [token]);
+
+  // When editing, prefill the role/JD from the saved rubric.
+  useEffect(() => {
+    if (!token || !existing) return;
+    api
+      .get<{ rubric: { roleTitle: string | null; jdText: string | null } | null }>(`/interviews/${existing.id}/copilot`, token)
+      .then((data) => {
+        if (data.rubric?.roleTitle) setRoleTitle(data.rubric.roleTitle);
+        if (data.rubric?.jdText) setJdText(data.rubric.jdText);
+      })
+      .catch(() => {});
+  }, [token, existing]);
 
   const toggleQuestion = (id: string) =>
     setSelectedQuestions((prev) => (prev.includes(id) ? prev.filter((q) => q !== id) : [...prev, id]));
@@ -66,6 +80,8 @@ export function InterviewForm({ existing }: Props) {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       notes,
       candidateInstructions,
+      roleTitle,
+      jdText,
     };
     try {
       if (existing) {
@@ -167,6 +183,33 @@ export function InterviewForm({ existing }: Props) {
               </label>
             );
           })}
+        </div>
+      </section>
+
+      {/* Role pack (Probe copilot) */}
+      <section className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="grid h-6 w-6 place-items-center rounded-md bg-indigo-600 text-[11px] font-bold text-white">P</span>
+          <label className="text-sm font-semibold text-slate-700">Probe role pack</label>
+        </div>
+        <p className="mb-3 text-xs text-slate-500">
+          Paste the role and JD — Probe builds the rubric it will coach you against during the interview. Leave blank for a
+          general strong-engineer pack.
+        </p>
+        <div className="space-y-3">
+          <input
+            value={roleTitle}
+            onChange={(e) => setRoleTitle(e.target.value)}
+            placeholder="Role title, e.g. Backend Engineer (Go, Postgres)"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <textarea
+            value={jdText}
+            onChange={(e) => setJdText(e.target.value)}
+            rows={4}
+            placeholder="Paste the job description here…"
+            className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
         </div>
       </section>
 

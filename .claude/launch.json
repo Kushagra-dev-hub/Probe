@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "expert",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:expert"],
+      "port": 3004
+    },
+    {
+      "name": "interviewer",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:interviewer"],
+      "port": 3003
+    },
+    {
+      "name": "interviewee",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:interviewee"],
+      "port": 3000
+    },
+    {
+      "name": "interviewee-alt",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:alt", "--workspace", "@probe/interviewee"],
+      "port": 3005
+    }
+  ]
+}

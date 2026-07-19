@@ -155,6 +155,65 @@ async function main() {
     create: { interviewId: interview.id, status: "scheduled" },
   });
 
+  // Probe role pack for the seeded interview, so the copilot is live on first boot
+  // without waiting on an LLM call.
+  const RUBRIC_ITEMS = [
+    {
+      key: "correctness",
+      title: "Working, verified solution",
+      description: "Writes code that solves the problem and checks it against the sample tests before calling it done.",
+      weakSignal: "Declares the solution done without running it, or ignores failing cases.",
+      strongSignal: "Runs the tests unprompted, walks through an edge case, fixes failures methodically.",
+    },
+    {
+      key: "complexity",
+      title: "Accurate complexity reasoning",
+      description: "States the real time/space cost of their code and can defend it line by line.",
+      weakSignal: "Names a complexity that doesn't match the written loops (e.g. calls a nested loop O(n log n)).",
+      strongSignal: "Derives the cost from the actual code and knows which input sizes would break it.",
+    },
+    {
+      key: "data_structures",
+      title: "Right data structure for the job",
+      description: "Chooses structures that make the operations cheap instead of forcing the first idea to work.",
+      weakSignal: "Nested scans where a hash map would do; no justification for the choice.",
+      strongSignal: "Names the trade-off explicitly and switches structure when the cost is wrong.",
+    },
+    {
+      key: "edge_cases",
+      title: "Edge-case thinking",
+      description: "Probes empty inputs, duplicates, extremes before being asked.",
+      weakSignal: "Only handles the happy path shown in the example.",
+      strongSignal: "Lists boundary cases up front and encodes them as checks or tests.",
+    },
+    {
+      key: "communication",
+      title: "Narrates the approach",
+      description: "Explains the plan before typing and keeps the interviewer oriented while coding.",
+      weakSignal: "Long silent stretches; code appears without a stated plan.",
+      strongSignal: "States the approach, estimates cost, flags uncertainty honestly.",
+    },
+    {
+      key: "debugging",
+      title: "Systematic debugging",
+      description: "When a run fails, isolates the cause instead of shotgun-editing.",
+      weakSignal: "Random edits after a failure; re-runs hoping it passes.",
+      strongSignal: "Reads the failing case, reasons about where state diverges, fixes the cause.",
+    },
+  ];
+
+  await prisma.interviewRubric.upsert({
+    where: { interviewId: interview.id },
+    update: {},
+    create: {
+      interviewId: interview.id,
+      roleTitle: "Backend Software Engineer",
+      jdText: "Backend SWE: data structures & algorithms fundamentals, Python or JavaScript, writes correct and efficient code under discussion, communicates trade-offs.",
+      items: RUBRIC_ITEMS as object[],
+      source: "manual",
+    },
+  });
+
   console.log("Seeded interview:", interview.id);
   console.log("  interviewer:", interviewer.id, "| interviewee:", interviewee.id);
 }

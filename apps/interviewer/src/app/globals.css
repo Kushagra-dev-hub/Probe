@@ -1,32 +1,97 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
+/* NOTE: katex CSS is imported by the room page (interview/[interviewId]/room/page.tsx) — keep exactly one import. */
 
+/* Override Tailwind v4's default dark: variant to use the .dark class (set by next-themes)
+   instead of @media (prefers-color-scheme: dark) */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ========================
+   InterviewForge Design System
+   ======================== */
+html {
+  scroll-behavior: smooth;
+}
+
 @theme inline {
+  /* Brand Colors */
   --color-primary: #4A7CFF;
   --color-primary-light: rgba(74, 124, 255, 0.1);
   --color-primary-dark: #3a63cc;
+
+  /* Backgrounds */
   --color-bg-light: #FAFBFC;
+  --color-bg-dark: #1c160d;
+  --color-editor-bg: #F8F9FC;
+
+  /* LeetCode-inspired Dark Theme */
   --color-lc-bg: #1a1a1a;
   --color-lc-surface: #282828;
   --color-lc-border: #3e3e3e;
   --color-lc-hover: #333333;
   --color-lc-input: #3a3a3a;
   --color-lc-elevated: #303030;
+
+  /* Accent */
+  --color-indigo-accent: #6366F1;
+
+  /* Social Brands */
+  --color-brand-google: #4285F4;
+  --color-brand-linkedin: #0077B5;
+  --color-brand-facebook: #1877F2;
+
+  /* Override Tailwind's default font stacks */
   --font-sans: 'Outfit', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --font-display: 'Syne', sans-serif;
   --font-body: 'Outfit', sans-serif;
+  --font-playfair: 'Playfair Display', serif;
   --font-nunito: 'Nunito', sans-serif;
+
+  /* Blog Palette Colors - Theme Aware */
+  --blog-default: #1f2933;
+  --blog-primary: #2f5d8c;
+  --blog-success: #3f6b57;
+  --blog-warning: #9f513f;
+  --blog-danger: #9f513f;
+  --blog-purple: #2f5d8c;
+  --blog-pink: #9f513f;
+  --blog-teal: #3f6b57;
+  --blog-indigo: #243b6b;
+  --blog-gray: #52606d;
+  --blog-orange: #9f513f;
+  --blog-cyan: #3f6b57;
+  --blog-mint: #3f6b57;
+  --blog-brown: #6f7652;
+  --blog-yellow: #6f7652;
+  --blog-lime: #6f7652;
+  --blog-magenta: #2f5d8c;
+  --blog-rose: #9f513f;
 }
 
-html {
-  scroll-behavior: smooth;
+.dark {
+  --blog-default: #f4f1ea;
+  --blog-primary: #8fb7df;
+  --blog-success: #9bbfac;
+  --blog-warning: #d89a88;
+  --blog-danger: #d89a88;
+  --blog-purple: #8fb7df;
+  --blog-pink: #d89a88;
+  --blog-teal: #9bbfac;
+  --blog-indigo: #9db2e5;
+  --blog-gray: #c7ced6;
+  --blog-orange: #d89a88;
+  --blog-cyan: #9bbfac;
+  --blog-mint: #9bbfac;
+  --blog-brown: #c3c99f;
+  --blog-yellow: #c3c99f;
+  --blog-lime: #c3c99f;
+  --blog-magenta: #8fb7df;
+  --blog-rose: #d89a88;
 }
 
+/* Base Styles */
 body {
-  margin: 0;
   font-family: 'Outfit', sans-serif;
   background-color: var(--color-bg-light);
   color: #0f172a;
@@ -36,7 +101,37 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-h1, h2, h3, h4, h5, h6 {
+/* Monaco AI change highlights (applied/inserted lines) */
+.ai-change-highlight {
+  background-color: rgba(34, 197, 94, 0.10) !important;
+}
+
+.ai-change-gutter {
+  background-color: #22c55e !important;
+  width: 3px !important;
+}
+
+@keyframes scroll-marquee {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  width: max-content;
+  animation: scroll-marquee 25s linear infinite;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: 'Nunito', sans-serif;
 }
 
@@ -46,10 +141,19 @@ body.dark {
   color: #eff1f6;
 }
 
+.font-display {
+  font-family: 'Syne', sans-serif;
+}
+
+.font-playfair {
+  font-family: 'Playfair Display', serif;
+}
+
 .font-nunito {
   font-family: 'Nunito', sans-serif;
 }
 
+/* Material Symbols ligature setup */
 .material-symbols-outlined,
 .material-symbols-rounded {
   font-family: 'Material Symbols Outlined';
@@ -68,6 +172,13 @@ body.dark {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
+code,
+pre,
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Custom Scrollbar */
 :root {
   --scrollbar-size: 8px;
   --scrollbar-thumb: rgba(15, 23, 42, 0.18);
@@ -85,18 +196,1032 @@ body.dark {
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
-*::-webkit-scrollbar { width: var(--scrollbar-size); height: var(--scrollbar-size); }
-*::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+*::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
 *::-webkit-scrollbar-thumb {
   background-color: var(--scrollbar-thumb);
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
-*:hover::-webkit-scrollbar-thumb { background-color: var(--scrollbar-thumb-hover); }
 
-.custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+*:hover::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: var(--scrollbar-thumb);
   border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+/* Monaco-like scrollbar to mirror code editor sizing in preview */
+.monaco-like-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.42) transparent;
+}
+
+.dark .monaco-like-scrollbar {
+  scrollbar-color: rgba(148, 163, 184, 0.46) transparent;
+}
+
+.monaco-like-scrollbar::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+.monaco-like-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.monaco-like-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.42);
+  border-radius: 7px;
+  border: 0;
+}
+
+.dark .monaco-like-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.46);
+}
+
+.monaco-like-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.62);
+}
+
+.dark .monaco-like-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.68);
+}
+
+/* Ultra-sleek scrollbar for LaTeX editor areas (PDF preview + related panes) */
+.latex-sleek-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.22) transparent;
+}
+
+.dark .latex-sleek-scrollbar {
+  scrollbar-color: rgba(148, 163, 184, 0.28) transparent;
+}
+
+.latex-sleek-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.latex-sleek-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.latex-sleek-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.22);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.dark .latex-sleek-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.28);
+}
+
+.latex-sleek-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.4);
+}
+
+.dark .latex-sleek-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.45);
+}
+
+/* Confetti dots animation */
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.4;
+  }
+
+  50% {
+    transform: translateY(-20px) scale(1.2);
+    opacity: 0.7;
+  }
+}
+
+.confetti-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  opacity: 0.4;
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Shimmer effect for progress bars */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%) skewX(-12deg);
+  }
+
+  100% {
+    transform: translateX(200%) skewX(-12deg);
+  }
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* Skill bar animation */
+@keyframes grow-width {
+  from {
+    width: 0;
+  }
+}
+
+.animate-grow {
+  animation: grow-width 1s ease-out forwards;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 20s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* ─── Feature Showcase – GSAP handles scroll reveals ─── */
+/* Image hover lift (CSS-only, supplements GSAP) */
+.feat-img-wrap {
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.5s ease;
+  will-change: transform;
+}
+
+.feat-img-wrap:hover {
+  transform: translateY(-7px) scale(1.018);
+  filter: drop-shadow(0 16px 32px rgba(74, 124, 255, 0.16));
+}
+
+/* ─── Glass Card System ─── */
+@layer base {
+  .glass-card {
+    background: rgba(243, 244, 246, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 16px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.18);
+    /* darker depth on all sides */
+  }
+
+  .dark .glass-card {
+    background: rgba(40, 40, 40, 0.85);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+    /* darker depth on all sides */
+  }
+}
+
+/* ─── Excalidraw CSS Isolation ───────────────────────────────────
+   Undo Tailwind v4 preflight resets inside the Excalidraw wrapper.
+   These rules are UNLAYERED, so they override Tailwind's @layer base
+   preflight, but Excalidraw's own unlayered CSS (higher specificity
+   via its .excalidraw classes) still takes precedence.
+   ─────────────────────────────────────────────────────────────── */
+
+/* 1. Undo universal border reset */
+.excalidraw-wrapper *,
+.excalidraw-wrapper *::before,
+.excalidraw-wrapper *::after {
+  border-width: revert;
+  border-style: revert;
+  border-color: revert;
+}
+
+/* 2. Undo block display on replaced/media elements (SVG icons, canvas) */
+.excalidraw-wrapper img,
+.excalidraw-wrapper svg,
+.excalidraw-wrapper video,
+.excalidraw-wrapper canvas,
+.excalidraw-wrapper audio,
+.excalidraw-wrapper iframe,
+.excalidraw-wrapper embed,
+.excalidraw-wrapper object {
+  display: revert;
+  vertical-align: revert;
+}
+
+/* 3. Undo form element resets (buttons, inputs, etc.) */
+.excalidraw-wrapper button,
+.excalidraw-wrapper input,
+.excalidraw-wrapper optgroup,
+.excalidraw-wrapper select,
+.excalidraw-wrapper textarea {
+  font-family: revert;
+  font-feature-settings: revert;
+  font-variation-settings: revert;
+  font-size: revert;
+  font-weight: revert;
+  line-height: revert;
+  letter-spacing: revert;
+  color: revert;
+  margin: revert;
+  padding: revert;
+  background-color: revert;
+  appearance: revert;
+}
+
+/* 4. Undo heading, paragraph, and list resets */
+.excalidraw-wrapper h1,
+.excalidraw-wrapper h2,
+.excalidraw-wrapper h3,
+.excalidraw-wrapper h4,
+.excalidraw-wrapper h5,
+.excalidraw-wrapper h6 {
+  font-size: revert;
+  font-weight: revert;
+}
+
+.excalidraw-wrapper ol,
+.excalidraw-wrapper ul,
+.excalidraw-wrapper menu {
+  list-style: revert;
+  margin: revert;
+  padding: revert;
+}
+
+/* 5. Undo anchor reset */
+.excalidraw-wrapper a {
+  color: revert;
+  text-decoration: revert;
+}
+
+/* 6. Undo summary display reset */
+.excalidraw-wrapper summary {
+  display: revert;
+}
+
+/* 7. Undo the table border collapse from preflight */
+.excalidraw-wrapper table {
+  border-collapse: revert;
+  border-color: revert;
+  text-indent: revert;
+}
+
+/* 8. Ensure Excalidraw fills its container */
+.excalidraw-wrapper .excalidraw,
+.excalidraw-wrapper .excalidraw .excalidraw-container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* 9. Match canvas background to app theme */
+.excalidraw-wrapper .excalidraw {
+  --island-bg-color: #ffffff;
+  --default-bg-color: #fafbfc;
+}
+
+.dark .excalidraw-wrapper .excalidraw {
+  --island-bg-color: #282828;
+  --default-bg-color: #1a1a2e;
+}
+
+/* 10. Contain z-index stacking so Excalidraw UI doesn't escape */
+.excalidraw-wrapper {
+  isolation: isolate;
+}
+
+@keyframes slideUpFade {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-slide-up-fade {
+  animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Modal entrance animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Hero Illustration Continuous Animations ── */
+
+/* Gentle floating up/down (monitor, elements) */
+@keyframes heroFloat {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.hero-anim-float {
+  animation: heroFloat 4s ease-in-out infinite;
+}
+
+/* Plant sway — subtle left-right rotation from base */
+@keyframes heroSway {
+
+  0%,
+  100% {
+    transform: rotate(0deg);
+    transform-origin: bottom center;
+  }
+
+  25% {
+    transform: rotate(1.5deg);
+  }
+
+  75% {
+    transform: rotate(-1.5deg);
+  }
+}
+
+.hero-anim-sway {
+  animation: heroSway 5s ease-in-out infinite;
+}
+
+/* Chair rock — very subtle tilt */
+@keyframes heroRock {
+
+  0%,
+  100% {
+    transform: rotate(0deg);
+    transform-origin: bottom center;
+  }
+
+  50% {
+    transform: rotate(-0.8deg);
+  }
+}
+
+.hero-anim-rock {
+  animation: heroRock 6s ease-in-out infinite;
+}
+
+/* Main illustration — subtle breathing scale + float */
+@keyframes heroBreathe {
+
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-4px) scale(1.005);
+  }
+}
+
+.hero-anim-breathe {
+  animation: heroBreathe 5s ease-in-out infinite;
+}
+
+/* Hero scene entrance — fade + slide up on load */
+.hero-scene {
+  animation: heroSceneIn 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes heroSceneIn {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.96);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ===================================================================
+   Custom Utilities
+   =================================================================== */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ========================
+   Pulse Glow on CTA
+   ======================== */
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 229, 0, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 0 12px rgba(255, 229, 0, 0);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2.5s ease-in-out infinite;
+}
+
+/* ========================
+   Feature Card Shine
+   ======================== */
+
+.feature-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.feature-card:hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(74, 124, 255, 0.06), transparent);
+  animation: shine 0.8s ease-out;
+  pointer-events: none;
+}
+
+@keyframes shine {
+  0% {
+    transform: translateX(-100%) skewX(-12deg);
+  }
+
+  100% {
+    transform: translateX(200%) skewX(-12deg);
+  }
+}
+
+/* ========================
+   Dark Mode — Component Colour Transitions
+   ======================== */
+
+#landing-page,
+#landing-page header,
+#landing-page section,
+#features-inner,
+#roles-inner,
+#landing-page .how-step-card,
+#landing-page .bg-white,
+#landing-page .glass-card,
+#landing-page .companies-section,
+#landing-page details,
+#landing-page .feature-card .rounded-2xl {
+  transition: background-color 0.5s ease, background 0.5s ease, border-color 0.45s ease;
+}
+
+#landing-page h1,
+#landing-page h2,
+#landing-page h3,
+#landing-page h4,
+#landing-page p,
+#landing-page li,
+#landing-page details summary,
+#landing-page header nav a {
+  transition: color 0.45s ease;
+}
+
+/* Anti-flash: apply dark background before React hydrates (script in <head> sets this) */
+html[data-dark="true"] {
+  background-color: #222222;
+  color-scheme: dark;
+}
+
+/* Interview Types page specific backgrounds to prevent white flash */
+html[data-dark="true"] body,
+.dark body {
+  background-color: #222222;
+}
+
+body {
+  background-color: #f4f5f7;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #222222;
+  }
+}
+
+/* Logo: always blue, no filter transition needed */
+
+#landing-page header button {
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+#landing-page .companies-section img {
+  transition: filter 0.4s ease;
+}
+
+#landing-page .step-circle>div {
+  transition: background-color 0.5s ease, border-color 0.45s ease, color 0.45s ease;
+}
+
+#landing-page .how-path {
+  transition: stroke 0.5s ease, opacity 0.5s ease;
+}
+
+#landing-page details>div {
+  transition: color 0.45s ease;
+}
+
+/* Blog card title hover → always turn blue on hover regardless of dark mode inline styles */
+#landing-page #blog .group:hover h3 {
+  color: #4A7CFF !important;
+}
+
+/* ── AI Tutor chat animations ── */
+
+/* Message enter animation */
+@keyframes chat-msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-msg-enter {
+  animation: chat-msg-in 0.22s ease-out both;
+}
+
+/* Typing dots */
+@keyframes typing-bounce {
+
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+
+  30% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+
+.typing-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+  animation: typing-bounce 1.2s ease-in-out infinite;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.30s;
+}
+
+/* Preview panel slide-in from right */
+@keyframes panel-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.preview-panel-enter {
+  animation: panel-slide-in 0.22s ease-out both;
+}
+
+/* Streaming status fade */
+@keyframes status-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.status-fade-enter {
+  animation: status-fade-in 0.18s ease-out both;
+}
+
+/* Preset pill stagger animation */
+@keyframes pill-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.preset-pill {
+  animation: pill-pop-in 0.2s ease-out both;
+}
+
+/* AI Tutor avatar choreography */
+@keyframes tutor-avatar-breathe {
+
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-1px) scale(1.035);
+  }
+}
+
+@keyframes tutor-avatar-type {
+
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+
+  25% {
+    transform: translateY(-1px) rotate(-0.8deg) scale(1.012);
+  }
+
+  50% {
+    transform: translateY(0.5px) rotate(0.8deg) scale(0.996);
+  }
+
+  75% {
+    transform: translateY(-0.5px) rotate(-0.4deg) scale(1.006);
+  }
+}
+
+@keyframes tutor-welcome-idle {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.tutor-welcome-stage {
+  isolation: isolate;
+  align-items: flex-start;
+}
+
+.tutor-welcome-figure {
+  opacity: 0;
+  transform: translateX(48px) translateY(16px);
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease;
+  will-change: transform, opacity;
+}
+
+.tutor-welcome-stage.active .tutor-welcome-figure {
+  opacity: 1;
+  transform: translateX(0) translateY(0);
+}
+
+.tutor-welcome-girl {
+  animation: tutor-welcome-idle 3s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+
+.tutor-welcome-shadow {
+  position: absolute;
+  left: 20%;
+  right: 14%;
+  bottom: 4px;
+  height: 18px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.12);
+  filter: blur(8px);
+  transform: scaleX(0.9);
+  z-index: -1;
+}
+
+.tutor-welcome-chips {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.24s ease 0.12s, transform 0.24s ease 0.12s;
+}
+
+.tutor-welcome-stage.active .tutor-welcome-chips {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tutor-input-avatar {
+  position: absolute;
+  left: 8%;
+  top: -82px;
+  z-index: auto;
+  width: 86px;
+  height: 86px;
+  overflow: visible;
+  background: transparent;
+  pointer-events: none;
+}
+
+.tutor-input-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 0%;
+  transform-origin: 50% 78%;
+  will-change: transform;
+}
+
+.tutor-input-avatar-idle img {
+  /* No idle animation to keep it perfectly still on the border */
+}
+
+.tutor-input-avatar-typing {
+  left: 8%;
+  top: -76px;
+}
+
+.tutor-input-avatar-typing img {
+  animation: tutor-avatar-type 1.2s ease-in-out infinite;
+}
+
+@media (max-width: 640px) {
+  .tutor-welcome-stage {
+    align-items: flex-start;
+    min-height: 420px;
+    padding-bottom: 12px;
+  }
+
+  .tutor-welcome-figure {
+    left: auto;
+    right: -52px;
+  }
+
+  .tutor-welcome-chips {
+    margin-left: 0;
+    margin-right: 0;
+    max-width: 100%;
+    padding-right: 0;
+  }
+
+  .tutor-welcome-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .tutor-input-avatar {
+    left: 5%;
+    top: -70px;
+    width: 72px;
+    height: 72px;
+  }
+
+  .tutor-input-avatar-typing {
+    left: 5%;
+    top: -62px;
+  }
+}
+
+/* KaTeX math sizing */
+.katex {
+  font-size: 1.15em;
+}
+
+/* Code block background variable */
+:root {
+  --code-block-bg: #eff6ff;
+}
+.dark {
+  --code-block-bg: #101010;
+}
+
+/* Force specific font for legal/static pages */
+.force-inter,
+.force-inter h1,
+.force-inter h2,
+.force-inter h3,
+.force-inter h4,
+.force-inter h5,
+.force-inter h6,
+.force-inter p,
+.force-inter span,
+.force-inter a,
+.force-inter div {
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* ========================
+   Custom Scrollbar Styles
+   ======================== */
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgb(203 213 225);
+  /* slate-300 */
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(148 163 184);
+  /* slate-400 */
+}
+
+/* Dark mode scrollbar */
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgb(71 85 105);
+  /* slate-600 */
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(100 116 139);
+  /* slate-500 */
+}
+
+/* Firefox */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(203 213 225) transparent;
+}
+
+.dark .scrollbar-thin {
+  scrollbar-color: rgb(71 85 105) transparent;
+}
+
+/* ========================
+   Contest Mode - Hide Navigation
+   ======================== */
+body.contest-active-hide-nav nav,
+body.contest-active-hide-nav aside,
+body.contest-active-hide-nav header {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Target the sidebar wrapper div specifically */
+body.contest-active-hide-nav .flex.flex-1.overflow-hidden > div:first-child,
+body.contest-active-hide-nav .flex.flex-1.overflow-hidden > aside,
+body.contest-active-hide-nav .flex.flex-1.overflow-hidden > nav {
+  display: none !important;
+}
+
+/* Make the app shell content full width when sidebar is hidden */
+body.contest-active-hide-nav .flex.flex-1.overflow-hidden > .flex-1 {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Ensure the main content container takes full width */
+body.contest-active-hide-nav .flex.flex-col.h-screen {
+  padding: 0 !important;
+}
+
+body.contest-active-hide-nav .flex.flex-1.overflow-hidden {
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+/* MCQ contest/practice IDE uses an Unstop-style surface with many fixed light utility
+   classes. Keep this scoped so only that IDE follows app dark mode. */
+.dark .contest-mcq-ide .bg-white {
+  background-color: #282828 !important;
+}
+
+.dark .contest-mcq-ide .bg-\[\#f4f6f8\],
+.dark .contest-mcq-ide .bg-\[\#f8fafc\],
+.dark .contest-mcq-ide .bg-\[\#fbfcfe\],
+.dark .contest-mcq-ide .bg-\[\#f8fbff\],
+.dark .contest-mcq-ide .bg-\[\#edf2f7\],
+.dark .contest-mcq-ide .bg-\[\#edf0f3\],
+.dark .contest-mcq-ide .bg-\[\#f2f4f7\],
+.dark .contest-mcq-ide .bg-\[\#f7f7f8\],
+.dark .contest-mcq-ide .bg-\[\#f4f4f4\] {
+  background-color: #1f1f1f !important;
+}
+
+.dark .contest-mcq-ide .text-black,
+.dark .contest-mcq-ide .text-\[\#111827\],
+.dark .contest-mcq-ide .text-\[\#222\],
+.dark .contest-mcq-ide .text-\[\#26364f\],
+.dark .contest-mcq-ide .text-\[\#333\],
+.dark .contest-mcq-ide .text-\[\#374151\],
+.dark .contest-mcq-ide .text-\[\#4a4a4a\],
+.dark .contest-mcq-ide .text-\[\#4b5563\],
+.dark .contest-mcq-ide .text-\[\#52667f\] {
+  color: #f8fafc !important;
+}
+
+.dark .contest-mcq-ide .border-\[\#dde3ea\],
+.dark .contest-mcq-ide .border-\[\#dfe5ec\],
+.dark .contest-mcq-ide .border-\[\#e2e5ea\],
+.dark .contest-mcq-ide .border-\[\#e3e7ed\],
+.dark .contest-mcq-ide .border-\[\#e5e7eb\],
+.dark .contest-mcq-ide .border-\[\#d8dde5\],
+.dark .contest-mcq-ide .border-\[\#cfd5de\] {
+  border-color: #3e3e3e !important;
+}
+
+/* ========================
+   Contest Mode - Disable Monaco Paste
+   ======================== */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }

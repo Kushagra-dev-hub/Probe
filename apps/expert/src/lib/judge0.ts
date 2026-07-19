@@ -196,3 +196,225 @@ export async function executePlainCode(input: {
 
   throw new Error("Code execution timed out while waiting for Judge0.");
 }
+
+/* ------------------------------------------------------------------ *
+ * SQL execution (ported pattern from practers sql-execution.ts): the whole
+ * script runs through Judge0's SQLite runtime (language 82). The question's
+ * wrapperCode carries the DDL/DML setup; the user's query is injected either
+ * at a {{USER_QUERY}} placeholder or appended after the setup. Output
+ * comparison is order-insensitive and whitespace-normalized.
+ * ------------------------------------------------------------------ */
+
+const SQLITE_LANGUAGE_ID = 82;
+
+function buildSqlScript(wrapperCode: string, userQuery: string): string {
+  const pragmas = ".headers on\n.mode column";
+  const injection = `${pragmas}\n\n${userQuery.trim()}`;
+  const wrapper = (wrapperCode || "").trim();
+  if (wrapper.includes("{{USER_QUERY}}")) return wrapper.replace("{{USER_QUERY}}", injection);
+  return [wrapper, "", pragmas, "", userQuery.trim()].join("\n");
+}
+
+function normalizeSqlOutput(value: string | null | undefined): string {
+  return (value ?? "")
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .sort()
+    .join("\n");
+}
+
+async function submitRaw(sourceCode: string, languageId: number, stdin?: string | null): Promise<ExpertCodeExecutionResult> {
+  const config = getJudge0Config();
+  const submitResponse = await fetch(`${config.apiUrl}/submissions?base64_encoded=true&wait=false`, {
+    method: "POST",
+    headers: config.headers,
+    body: JSON.stringify({
+      source_code: Buffer.from(sourceCode).toString("base64"),
+      language_id: languageId,
+      stdin: stdin ? Buffer.from(stdin).toString("base64") : undefined,
+      cpu_time_limit: config.cpuTimeLimit,
+      wall_time_limit: config.wallTimeLimit,
+      memory_limit: config.memoryLimitKb,
+    }),
+  });
+  if (!submitResponse.ok) throw new Error("Code execution service rejected the submission.");
+  const submitted = (await submitResponse.json()) as Judge0SubmissionResponse;
+  if (!submitted.token) throw new Error("Code execution service did not return a token.");
+
+  for (let attempt = 0; attempt < config.pollMaxAttempts; attempt += 1) {
+    const resultResponse = await fetch(
+      `${config.apiUrl}/submissions/${encodeURIComponent(submitted.token)}?base64_encoded=true&fields=status,stdout,stderr,compile_output,message,time,memory`,
+      { headers: config.headers }
+    );
+    if (!resultResponse.ok) throw new Error("Code execution service could not fetch the result.");
+    const result = (await resultResponse.json()) as Judge0ResultResponse;
+    if (TERMINAL_STATUSES.has(Number(result.status?.id || 0))) return normalizeResult(result);
+    await sleep(Math.min(config.pollInitialDelayMs * Math.pow(1.5, attempt), config.pollMaxDelayMs));
+  }
+  throw new Error("Code execution timed out while waiting for Judge0.");
+}
+
+export type SqlRunResult = {
+  /** Raw stdout of the user's query against the seeded schema. */
+  result: ExpertCodeExecutionResult;
+  /** Present when the question ships expected outputs — per-case verdicts. */
+  tests: TestCaseOutcome[];
+  passedCount: number;
+  totalCount: number;
+};
+
+export async function executeSql(input: {
+  query: string;
+  wrapperCode: string;
+  tests: SampleTest[];
+}): Promise<SqlRunResult> {
+  const script = buildSqlScript(input.wrapperCode, input.query);
+  const result = await submitRaw(script, SQLITE_LANGUAGE_ID);
+
+  const tests: TestCaseOutcome[] = input.tests.map((test, index) => {
+    const passed = result.statusId === 3 && normalizeSqlOutput(result.stdout) === normalizeSqlOutput(test.expectedOutput);
+    return {
+      id: test.id,
+      index,
+      passed,
+      status: result.status,
+      stdin: test.stdin,
+      expectedOutput: test.expectedOutput,
+      actualOutput: result.stdout,
+      stderr: result.stderr,
+      compileOutput: result.compileOutput,
+      time: result.time,
+    };
+  });
+
+  return {
+    result,
+    tests,
+    passedCount: tests.filter((t) => t.passed).length,
+    totalCount: tests.length,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Per-test-case execution (practers-style run/submit): execute the code
+ * once per sample test with that test's stdin, then compare trimmed
+ * outputs. Sequential to stay friendly to the shared RapidAPI quota.
+ * ------------------------------------------------------------------ */
+
+export type SampleTest = {
+  id: string;
+  stdin: string;
+  expectedOutput: string;
+};
+
+export type TestCaseOutcome = {
+  id: string;
+  index: number;
+  passed: boolean;
+  status: string;
+  stdin: string;
+  expectedOutput: string;
+  actualOutput: string | null;
+  stderr: string | null;
+  compileOutput: string | null;
+  time: string | null;
+};
+
+export type TestRunResult = {
+  tests: TestCaseOutcome[];
+  passedCount: number;
+  totalCount: number;
+  /** Worst raw result across the cases — statusId/status reflect it. */
+  worst: ExpertCodeExecutionResult;
+};
+
+function normalizeOutput(value: string | null | undefined): string {
+  return (value ?? "")
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .trim();
+}
+
+export function extractSampleTests(raw: unknown): SampleTest[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((entry, index) => {
+      if (!entry || typeof entry !== "object") return null;
+      const test = entry as Record<string, unknown>;
+      const stdin = test.stdin ?? test.input ?? "";
+      const expected = test.expected_output ?? test.expectedOutput ?? test.output ?? "";
+      return {
+        id: String(test.id ?? `t${index + 1}`),
+        stdin: typeof stdin === "string" ? stdin : JSON.stringify(stdin),
+        expectedOutput: typeof expected === "string" ? expected : JSON.stringify(expected),
+      };
+    })
+    .filter((t): t is SampleTest => t !== null);
+}
+
+/**
+ * Compose the runnable source. Mongo DSA questions ship a per-language
+ * `wrapper_code` harness (reads stdin, calls the user's function); the user's
+ * buffer replaces a {{USER_CODE}} placeholder when present, else prefixes it.
+ */
+function composeSource(code: string, wrapper?: string | null): string {
+  const harness = (wrapper || "").trim();
+  if (!harness) return code;
+  if (harness.includes("{{USER_CODE}}")) return harness.replace("{{USER_CODE}}", code);
+  return `${code}\n\n${harness}`;
+}
+
+export async function executeAgainstTests(input: {
+  code: string;
+  language: string;
+  tests: SampleTest[];
+  wrapper?: string | null;
+}): Promise<TestRunResult> {
+  const tests: TestCaseOutcome[] = [];
+  let worst: ExpertCodeExecutionResult | null = null;
+  const source = composeSource(input.code, input.wrapper);
+
+  for (let index = 0; index < input.tests.length; index += 1) {
+    const test = input.tests[index];
+    const result = await executePlainCode({ code: source, language: input.language, stdin: test.stdin });
+    // Status 3 = Accepted (ran fine); anything else is a compile/runtime failure.
+    const ranClean = result.statusId === 3;
+    const passed = ranClean && normalizeOutput(result.stdout) === normalizeOutput(test.expectedOutput);
+    tests.push({
+      id: test.id,
+      index,
+      passed,
+      status: result.status,
+      stdin: test.stdin,
+      expectedOutput: test.expectedOutput,
+      actualOutput: result.stdout,
+      stderr: result.stderr,
+      compileOutput: result.compileOutput,
+      time: result.time,
+    });
+    if (!worst || (worst.statusId === 3 && result.statusId !== 3)) worst = result;
+    // A compile error will fail every case identically — stop early.
+    if (result.compileOutput && result.statusId === 6) break;
+  }
+
+  const passedCount = tests.filter((t) => t.passed).length;
+  return {
+    tests,
+    passedCount,
+    totalCount: input.tests.length,
+    worst: worst ?? {
+      statusId: 0,
+      status: "No tests",
+      stdout: null,
+      stderr: null,
+      compileOutput: null,
+      message: null,
+      time: null,
+      memory: null,
+    },
+  };
+}

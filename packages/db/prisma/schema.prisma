@@ -33,16 +33,18 @@ enum Recommendation {
   reject
 }
 
-/// A person who can join a room. `id` mirrors the Supabase auth user id.
+/// A person who can join a room. `id` mirrors the Supabase auth user id when
+/// Supabase auth is used; local email/password auth stores a bcrypt hash here.
 model User {
-  id        String   @id
-  email     String?  @unique
-  name      String
-  avatarUrl String?  @map("avatar_url")
-  username  String?  @unique
-  role      Role
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  email        String?  @unique
+  name         String
+  passwordHash String?  @map("password_hash")
+  avatarUrl    String?  @map("avatar_url")
+  username     String?  @unique
+  role         Role
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   interviewsAsInterviewer Interview[] @relation("InterviewerInterviews")
   interviewsAsInterviewee Interview[] @relation("IntervieweeInterviews")
@@ -65,6 +67,17 @@ model Interview {
   activeQuestionIndex Int             @default(0) @map("active_question_index")
   candidateInstructions String?       @map("candidate_instructions")
   interviewerNotes    String?         @map("interviewer_notes")
+  /// Selected rounds for this interview: 'dsa' | 'sql' | 'system_design'.
+  rounds              String[]        @default([])
+  /// Public share token — the candidate joins via /join/<shareToken>.
+  shareToken          String?         @unique @map("share_token")
+  companyName         String?         @map("company_name")
+  roleTitle           String?         @map("role_title")
+  experienceLevel     String?         @map("experience_level")
+  resumeFileName      String?         @map("resume_file_name")
+  resumeText          String?         @map("resume_text")
+  resumeUploadedAt    DateTime?       @map("resume_uploaded_at")
+  resumeAnalysis      Json?           @map("resume_analysis")
   createdAt           DateTime        @default(now()) @map("created_at")
   updatedAt           DateTime        @updatedAt @map("updated_at")
 
@@ -74,10 +87,47 @@ model Interview {
   questions   InterviewQuestion[]
   roomSession RoomSession?
   evaluation  RoomEvaluation?
+  rubric      InterviewRubric?
+  scorecard   CopilotScorecard?
 
   @@index([interviewerId])
   @@index([intervieweeId])
   @@map("interviews")
+}
+
+/// The Probe "role pack": 6-8 things a strong hire can prove, generated from the
+/// role title + JD at interview creation. Human-inspectable, versioned.
+/// items: [{ key, title, description, weakSignal, strongSignal }]
+model InterviewRubric {
+  id          String   @id @default(uuid())
+  interviewId String   @unique @map("interview_id")
+  roleTitle   String?  @map("role_title")
+  jdText      String?  @map("jd_text")
+  items       Json     @default("[]")
+  version     Int      @default(1)
+  source      String   @default("generated") // generated | fallback | manual
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  @@map("interview_rubrics")
+}
+
+/// Evidence-linked scorecard drafted by the copilot at session end. Assistive only —
+/// the interviewer's RoomEvaluation stays the human record.
+/// items: [{ key, title, verdict, evidence[], note }]
+model CopilotScorecard {
+  id          String   @id @default(uuid())
+  interviewId String   @unique @map("interview_id")
+  summary     String?
+  items       Json     @default("[]")
+  generatedAt DateTime @default(now()) @map("generated_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  @@map("copilot_scorecards")
 }
 
 /// A question attached to an interview (may reference a bank question or be inline).
@@ -139,6 +189,8 @@ model RoomSession {
   activeQuestionId        String?   @map("active_question_id")
   activeQuestionIndex     Int       @default(0) @map("active_question_index")
   activeQuestionRevealedAt DateTime? @map("active_question_revealed_at")
+  /// Which shared surface is live in the room: meet | dsa | sql | design.
+  activeSurface           String    @default("meet") @map("active_surface")
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
 

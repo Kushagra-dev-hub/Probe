@@ -356,3 +356,50 @@ with the reason shown.
 All three services typecheck clean; `/me`, `/interviews`, `/interviews/resources`, `POST`, `PATCH` all exercised live
 against Supabase; both dashboards + `/new` + `/edit` compile and return 200. Servers restarted (expert :3004,
 interviewer :3003, interviewee :3000).
+
+---
+
+## 12. Probe copilot — BUILT (the pitch-deck differentiator, shipped 2026-07-19)
+
+The AI layer from the pitch deck: reads the candidate's actual work live, checks it against a role rubric,
+and tells the interviewer the one question to ask next. **Interviewer-only by design** — no copilot event or
+score ever reaches the candidate. Verified end-to-end in two live rooms (naive O(n²) Two Sum with a wrong
+"O(n log n)" comment → copilot card *"How does the O(n log n) comment match the two loops?"* citing lines 6-7).
+
+### Pieces
+- **LLM client** `apps/expert/src/lib/llm.ts` — JSON-mode via plain fetch, provider chain Gemini → xAI → Groq
+  (env keys `GOOGLE_GENERATIVE_AI_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`; model overrides `GEMINI_MODEL`,
+  `XAI_MODEL`, `GROQ_MODEL`). **Only the xAI key is currently valid** — the Gemini/Groq keys copied from
+  practers were dead and are commented out in `.env`. Reasoning models need big `maxOutputTokens` (hidden
+  thinking counts against the cap — this bit us; caps are now 4096/8192).
+- **Engine** `apps/expert/src/lib/copilot.ts` — per-interview in-memory runtime (rubric, question context,
+  latest code, run history, suggestion history). Triggers: editor-sync (candidate only, 7s idle debounce,
+  20s min interval, ≥25-char delta), execution completion, question change, manual. Grounding rules live in
+  `SUGGESTION_SYSTEM` / `SCORECARD_SYSTEM` prompts: cite exact lines, judge the work never the person,
+  one question ≤25 words, `{"skip":true}` when nothing is worth asking, unknown when never exercised.
+  Every analysis is logged to `room_events` (`copilot_analysis` / `copilot_suggestion` / `copilot_scorecard`).
+- **Rubric ("role pack")** — `InterviewRubric` Prisma model; generated from `roleTitle`+`jdText` on interview
+  create/edit (fire-and-forget) or `POST /interviews/:id/rubric`; deterministic 6-item fallback when no LLM.
+  Seed gives `seed-interview` a manual Backend-SWE rubric so the demo works instantly.
+- **Scorecard** — `CopilotScorecard` model; auto-drafted on `direct:end-session` (background) and on demand via
+  `direct:copilot-scorecard`; strong/mixed/thin/unknown per rubric row, each verdict evidence-cited; rendered by
+  `ScorecardView` on the interviewer end screen with "Use as evaluation draft" (prefills strengths/concerns/notes).
+- **Per-test run/submit** — `executeAgainstTests` in `judge0.ts` runs each bank `sampleTests` case (sequential,
+  early-exit on compile error) and compares trimmed outputs. `ExecutionResult` gained `tests[]`/`passedCount`/
+  `totalCount`; `stdout` carries the practers-shaped `{sample:{tests,summary}}` JSON so the ported room output
+  formatter renders per-case output unchanged. Both room UIs show a passed badge + red/green case dots.
+- **Contract** — C→S `direct:copilot-analyze`, `direct:copilot-scorecard`; S→C `direct:copilot-suggestion`,
+  `direct:copilot-status`, `direct:copilot-scorecard` (delivered to `userRoom(interviewerId)` only).
+  REST: `GET /interviews/:id/copilot` (hydration: rubric+suggestions+scorecard), `POST /interviews/:id/rubric`.
+- **UI** — `apps/interviewer/src/components/copilot.tsx` (`CopilotPanel` in the room's right panel: ASK-THIS-NEXT
+  card with evidence excerpt/lines/rubric chip/confidence, history, role-pack viewer, "Suggest a question now";
+  `ScorecardView` on the end screen). Role/JD fields in `interview-form.tsx`. The shared room hook gained
+  copilot state/actions and stays byte-identical between both apps.
+
+### Gotchas
+- Copilot runtime (run history) is in-memory; a server restart keeps code snapshots + suggestions (DB) but
+  loses run summaries — the scorecard then honestly reports items as unknown rather than inventing.
+- Port 3000 clash: if another project holds :3000, run the candidate app with
+  `npm run dev:alt --workspace @probe/interviewee` (:3005) — `NEXT_PUBLIC_APP_URL` in `.env` whitelists that
+  origin in the expert's CORS. Restart the expert after `.env` changes.
+- Voice signal, SQL editor, and design canvas from the deck are NOT built — IDE + runs are the MVP surfaces.

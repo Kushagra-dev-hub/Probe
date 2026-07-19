@@ -16,8 +16,18 @@ import {
     type LobbyRequest as ContractLobbyRequest,
     type LobbyState as ContractLobbyState,
     type Recommendation,
+    type CopilotSuggestion,
+    type CopilotStatus,
+    type CopilotScorecard,
+    type CopilotInsight,
+    type ResumeAnalysis,
+    type RoomSurface,
+    type SurfaceState,
+    type TranscriptEntry,
 } from "@probe/contract";
 import { useAuth } from "@/context/auth-context";
+
+export type { CopilotSuggestion, CopilotStatus, CopilotScorecard, CopilotInsight, ResumeAnalysis, RoomSurface, SurfaceState, TranscriptEntry };
 
 /* ------------------------------------------------------------------ *
  * Local (page-facing) shapes. These intentionally keep the original
@@ -68,6 +78,9 @@ export type DirectRoomBootstrap = {
     candidate: { id: string; name: string; email: string | null; avatarUrl?: string | null; username?: string | null };
     interviewer: { memberId: string | null; name: string; email: string | null };
     permissions: { canAdmitCandidate: boolean; canRunCode: boolean; canEditCode: boolean };
+    rounds: string[];
+    activeSurface: RoomSurface;
+    resume: { fileName: string | null; uploadedAt: string | null } | null;
 };
 
 export type DirectRoomState = Pick<
@@ -108,6 +121,9 @@ function mapBootstrap(b: ContractBootstrap): DirectRoomBootstrap {
         candidate: b.interviewee,
         interviewer: b.interviewer,
         permissions: b.permissions,
+        rounds: b.rounds ?? [],
+        activeSurface: b.activeSurface ?? "meet",
+        resume: b.resume ?? null,
     };
 }
 
@@ -176,6 +192,13 @@ export function useInterviewRoom(identifier: string) {
     const [screenOffer, setScreenOffer] = useState<{ directInterviewId: string; sdp: string } | null>(null);
     const [screenAnswer, setScreenAnswer] = useState<{ directInterviewId: string; sdp: string } | null>(null);
     const [screenIce, setScreenIce] = useState<{ directInterviewId: string; candidate: string } | null>(null);
+    const [copilotSuggestions, setCopilotSuggestions] = useState<CopilotSuggestion[]>([]);
+    const [copilotStatus, setCopilotStatus] = useState<CopilotStatus | null>(null);
+    const [copilotScorecard, setCopilotScorecard] = useState<CopilotScorecard | null>(null);
+    const [copilotInsights, setCopilotInsights] = useState<CopilotInsight[]>([]);
+    const [resumeAnalysis, setResumeAnalysis] = useState<ResumeAnalysis | null>(null);
+    const [surfaceState, setSurfaceState] = useState<SurfaceState | null>(null);
+    const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
 
     // Emit join-session and hydrate bootstrap from the ack. Used on first connect,
     // on every reconnect (so room membership is restored), and by reload().
@@ -235,6 +258,34 @@ export function useInterviewRoom(identifier: string) {
         socket.on("direct:screen-offer", (p) => setScreenOffer({ directInterviewId: p.interviewId, sdp: p.sdp }));
         socket.on("direct:screen-answer", (p) => setScreenAnswer({ directInterviewId: p.interviewId, sdp: p.sdp }));
         socket.on("direct:screen-ice", (p) => setScreenIce({ directInterviewId: p.interviewId, candidate: p.candidate }));
+        socket.on("direct:copilot-suggestion", (p) => {
+            if (p.interviewId !== identifierRef.current) return;
+            setCopilotSuggestions((list) => (list.some((s) => s.id === p.id) ? list : [...list, p].slice(-20)));
+        });
+        socket.on("direct:copilot-status", (p) => {
+            if (p.interviewId !== identifierRef.current) return;
+            setCopilotStatus(p);
+        });
+        socket.on("direct:copilot-scorecard", (p) => {
+            if (p.interviewId !== identifierRef.current) return;
+            setCopilotScorecard(p);
+        });
+        socket.on("direct:copilot-insight", (p) => {
+            if (p.interviewId !== identifierRef.current) return;
+            setCopilotInsights((list) => (list.some((i) => i.id === p.id) ? list : [...list, p].slice(-30)));
+        });
+        socket.on("direct:resume-analysis", (p) => {
+            if (p.interviewId !== identifierRef.current) return;
+            setResumeAnalysis(p);
+        });
+        socket.on("direct:surface-state", (p) => {
+            if (p.interviewId !== identifierRef.current) return;
+            setSurfaceState(p);
+        });
+        socket.on("direct:transcript-entry", (p) => {
+            if (p.interviewId !== identifierRef.current) return;
+            setTranscript((list) => [...list, p].slice(-200));
+        });
 
         return () => {
             socket.removeAllListeners();
@@ -290,6 +341,54 @@ export function useInterviewRoom(identifier: string) {
             else if (response.data) setEvaluation(response.data);
         });
     }, [withId]);
+
+    const requestCopilotAnalysis = useCallback(() => {
+        socketRef.current?.emit("direct:copilot-analyze", { interviewId: identifierRef.current }, (response) => {
+            if (!response?.ok) setError(response?.message || response?.error || "Copilot analysis failed.");
+        });
+    }, []);
+
+    const requestCopilotScorecard = useCallback(() => {
+        socketRef.current?.emit("direct:copilot-scorecard", { interviewId: identifierRef.current }, (response) => {
+            if (!response?.ok) setError(response?.message || response?.error || "Scorecard generation failed.");
+            else if (response.data) setCopilotScorecard(response.data);
+        });
+    }, []);
+
+    const changeSurface = useCallback((surface: RoomSurface) => {
+        socketRef.current?.emit("direct:surface-change", { interviewId: identifierRef.current, surface }, (response) => {
+            if (!response?.ok) setError(response?.message || response?.error || "Could not switch the workspace.");
+        });
+    }, []);
+
+    const sendTranscript = useCallback((text: string, isFinal: boolean, speaker: "interviewer" | "interviewee" = "interviewee") => {
+        socketRef.current?.emit("direct:transcript", {
+            interviewId: identifierRef.current,
+            speaker,
+            text,
+            isFinal,
+            at: new Date().toISOString(),
+        });
+    }, []);
+
+    const seedCopilotState = useCallback((state: { suggestions?: CopilotSuggestion[]; scorecard?: CopilotScorecard | null; insights?: CopilotInsight[]; resumeAnalysis?: ResumeAnalysis | null }) => {
+        if (state.suggestions?.length) {
+            setCopilotSuggestions((list) => {
+                const seen = new Set(list.map((s) => s.id));
+                const merged = [...(state.suggestions || []).filter((s) => !seen.has(s.id)), ...list];
+                return merged.sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(-20);
+            });
+        }
+        if (state.scorecard) setCopilotScorecard((current) => current ?? state.scorecard ?? null);
+        if (state.insights?.length) {
+            setCopilotInsights((list) => {
+                const seen = new Set(list.map((i) => i.id));
+                const merged = [...(state.insights || []).filter((i) => !seen.has(i.id)), ...list];
+                return merged.sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(-30);
+            });
+        }
+        if (state.resumeAnalysis) setResumeAnalysis((current) => current ?? state.resumeAnalysis ?? null);
+    }, []);
 
     const sendSignalOffer = useCallback((directInterviewId: string, sdp: string) => { socketRef.current?.emit("direct:signal-offer", { interviewId: directInterviewId, sdp }); }, []);
     const sendSignalAnswer = useCallback((directInterviewId: string, sdp: string) => { socketRef.current?.emit("direct:signal-answer", { interviewId: directInterviewId, sdp }); }, []);
@@ -347,6 +446,18 @@ export function useInterviewRoom(identifier: string) {
         clearScreenOffer: () => setScreenOffer(null),
         clearScreenAnswer: () => setScreenAnswer(null),
         clearScreenIce: () => setScreenIce(null),
+        copilotSuggestions,
+        copilotStatus,
+        copilotScorecard,
+        copilotInsights,
+        resumeAnalysis,
+        surfaceState,
+        transcript,
+        requestCopilotAnalysis,
+        requestCopilotScorecard,
+        seedCopilotState,
+        changeSurface,
+        sendTranscript,
         reload: join,
     };
 }

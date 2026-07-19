@@ -13,6 +13,8 @@ import "katex/dist/katex.min.css";
 import { useAuth } from "@/context/auth-context";
 import { useInterviewRoom } from "@/hooks/use-interview-room";
 import { api } from "@/lib/api";
+import { CopilotPanel, ScorecardView } from "@/components/copilot";
+import type { CopilotScorecard, CopilotSuggestion, InterviewRubric } from "@probe/contract";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -526,8 +528,40 @@ function InterviewerRoom() {
         sendScreenIce,
         clearScreenOffer,
         clearScreenIce,
+        copilotSuggestions,
+        copilotStatus,
+        copilotScorecard,
+        requestCopilotAnalysis,
+        requestCopilotScorecard,
+        seedCopilotState,
         reload,
     } = useInterviewRoom(identifier);
+    const [rubric, setRubric] = useState<InterviewRubric | null>(null);
+    const [scorecardGenerating, setScorecardGenerating] = useState(false);
+
+    // Hydrate copilot state (role pack + prior suggestions + scorecard) over REST —
+    // live updates then stream in over the socket.
+    useEffect(() => {
+        if (!session?.access_token || !identifier) return;
+        api.get<{ rubric: InterviewRubric | null; suggestions: CopilotSuggestion[]; scorecard: CopilotScorecard | null }>(
+            `/interviews/${identifier}/copilot`,
+            session.access_token
+        )
+            .then((data) => {
+                setRubric(data.rubric);
+                seedCopilotState({ suggestions: data.suggestions, scorecard: data.scorecard });
+            })
+            .catch(() => {});
+    }, [identifier, seedCopilotState, session?.access_token]);
+
+    useEffect(() => {
+        if (copilotScorecard) setScorecardGenerating(false);
+    }, [copilotScorecard]);
+
+    const generateScorecard = useCallback(() => {
+        setScorecardGenerating(true);
+        requestCopilotScorecard();
+    }, [requestCopilotScorecard]);
 
     const status = roomState?.status || bootstrap?.status || "scheduled";
     const admitted = Boolean(roomState?.candidateAdmittedAt || bootstrap?.candidateAdmittedAt || status === "active");
@@ -1094,6 +1128,19 @@ function InterviewerRoom() {
                         </div>
                     </div>
 
+                    <div className="mb-6">
+                        <ScorecardView
+                            scorecard={copilotScorecard}
+                            generating={scorecardGenerating}
+                            onGenerate={generateScorecard}
+                            onCopyToEvaluation={({ strengths, concerns, notes }) => {
+                                if (strengths.length) setEvaluationStrengths((list) => Array.from(new Set([...list, ...strengths])).slice(0, 12));
+                                if (concerns.length) setEvaluationConcerns((list) => Array.from(new Set([...list, ...concerns])).slice(0, 12));
+                                if (notes) setEvaluationNotes((current) => (current ? current : notes));
+                            }}
+                        />
+                    </div>
+
                     <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-lc-border dark:bg-lc-surface">
                         <div>
                             <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Recommendation</label>
@@ -1470,7 +1517,14 @@ function InterviewerRoom() {
                                             <span className="material-symbols-outlined text-[18px] text-orange-500">terminal</span>
                                             <span className="text-[13px] font-bold uppercase tracking-wider text-slate-700 dark:text-white">Test Results</span>
                                         </div>
-                                        {activeExecutionState && <span className="text-xs font-bold capitalize text-slate-500">{activeExecutionState.phase} - {activeExecutionState.mode}</span>}
+                                        <div className="flex items-center gap-2">
+                                            {activeExecutionState?.result?.passedCount != null && activeExecutionState?.result?.totalCount != null && (
+                                                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${activeExecutionState.result.passedCount === activeExecutionState.result.totalCount ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400" : "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400"}`}>
+                                                    {activeExecutionState.result.passedCount}/{activeExecutionState.result.totalCount} passed
+                                                </span>
+                                            )}
+                                            {activeExecutionState && <span className="text-xs font-bold capitalize text-slate-500">{activeExecutionState.phase} - {activeExecutionState.mode}</span>}
+                                        </div>
                                     </div>
                                     <div className="custom-scrollbar flex flex-1 flex-col overflow-auto bg-white p-4 dark:bg-lc-surface">
                                         {activeExecutionState?.executionError ? (
@@ -1484,17 +1538,20 @@ function InterviewerRoom() {
                                         ) : testCasesToDisplay.length > 0 ? (
                                             <div className="flex h-full flex-col gap-4">
                                                 <div className="flex gap-6 border-b border-slate-100 px-2 dark:border-lc-border">
-                                                    {testCasesToDisplay.map((testCase, index) => (
-                                                        <button
-                                                            key={testCase.id || `case_${index}`}
-                                                            type="button"
-                                                            onClick={() => setActiveTestCase(index)}
-                                                            className={`relative top-px flex items-center gap-1.5 border-b-2 pb-3 text-[14px] font-bold transition-colors ${activeTestCase === index ? "border-orange-500 text-orange-500" : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"}`}
-                                                        >
-                                                            <span className={`size-2 rounded-full ${activeExecutionState?.phase === "running" ? "animate-pulse bg-blue-400" : activeExecutionState?.result ? "bg-green-500" : "bg-slate-300 dark:bg-slate-600"}`} />
-                                                            Case {index + 1}
-                                                        </button>
-                                                    ))}
+                                                    {testCasesToDisplay.map((testCase, index) => {
+                                                        const outcome = activeExecutionState?.result?.tests?.find((t) => t.id === String(testCase.id ?? "")) ?? activeExecutionState?.result?.tests?.[index];
+                                                        return (
+                                                            <button
+                                                                key={testCase.id || `case_${index}`}
+                                                                type="button"
+                                                                onClick={() => setActiveTestCase(index)}
+                                                                className={`relative top-px flex items-center gap-1.5 border-b-2 pb-3 text-[14px] font-bold transition-colors ${activeTestCase === index ? "border-orange-500 text-orange-500" : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"}`}
+                                                            >
+                                                                <span className={`size-2 rounded-full ${activeExecutionState?.phase === "running" ? "animate-pulse bg-blue-400" : outcome ? (outcome.passed ? "bg-green-500" : "bg-red-500") : activeExecutionState?.result ? "bg-green-500" : "bg-slate-300 dark:bg-slate-600"}`} />
+                                                                Case {index + 1}
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
                                                 <div className="custom-scrollbar flex flex-1 gap-4 overflow-auto pb-4">
                                                     <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -1669,6 +1726,14 @@ function InterviewerRoom() {
                                                 {joining ? "Reconnecting…" : "Reconnect room"}
                                             </button>
                                         </div>
+
+                                        <CopilotPanel
+                                            suggestions={copilotSuggestions}
+                                            status={copilotStatus}
+                                            rubric={rubric}
+                                            onAnalyze={requestCopilotAnalysis}
+                                            canAnalyze={admitted && !sessionEnded}
+                                        />
 
                                         <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-lc-border dark:bg-lc-bg">
                                             <div className="flex items-center justify-between">
