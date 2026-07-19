@@ -154,34 +154,44 @@ export default function SchedulePage() {
             Schedule sessions, share candidate links, and jump into the room.
           </p>
         </div>
-        {/* New interview — hover reveals Instant / Later; a plain click defaults to Later (modal) */}
+        {/* New interview — hover reveals Instant / Later; a plain click defaults to the Later wizard */}
         <div className="group relative">
-          <button
-            onClick={() => setModal("new")}
-            disabled={Boolean(wrongRole)}
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-night shadow-lg shadow-primary/25 transition hover:bg-primary-dark hover:shadow-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <span className="material-symbols-outlined text-[20px]">add</span>
-            New interview
-            <span className="material-symbols-outlined text-[18px] transition-transform group-hover:rotate-180">expand_more</span>
-          </button>
+          {wrongRole ? (
+            <button
+              disabled
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-night opacity-50 cursor-not-allowed"
+            >
+              <span className="material-symbols-outlined text-[20px]">add</span>
+              New interview
+              <span className="material-symbols-outlined text-[18px]">expand_more</span>
+            </button>
+          ) : (
+            <Link
+              href="/later"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-night shadow-lg shadow-primary/25 transition hover:bg-primary-dark hover:shadow-primary/40"
+            >
+              <span className="material-symbols-outlined text-[20px]">add</span>
+              New interview
+              <span className="material-symbols-outlined text-[18px] transition-transform group-hover:rotate-180">expand_more</span>
+            </Link>
+          )}
           {!wrongRole && (
             <div className="invisible absolute right-0 top-full z-50 translate-y-1 pt-2 opacity-0 transition-all duration-150 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
               <div className="w-56 overflow-hidden rounded-xl border border-white/10 bg-lc-surface p-1 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)]">
-                <button onClick={() => setModal("new")} className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2.5 text-left transition hover:bg-white/5">
+                <Link href="/instant" className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2.5 text-left transition hover:bg-white/5">
                   <span className="material-symbols-outlined mt-0.5 text-[19px] text-mint">bolt</span>
                   <span className="leading-tight">
                     <span className="block text-sm font-semibold text-white">Instant interview</span>
                     <span className="block text-[11px] text-[#8a8a8a]">Start a room right now</span>
                   </span>
-                </button>
-                <button onClick={() => setModal("new")} className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2.5 text-left transition hover:bg-white/5">
+                </Link>
+                <Link href="/later" className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2.5 text-left transition hover:bg-white/5">
                   <span className="material-symbols-outlined mt-0.5 text-[19px] text-steel">calendar_month</span>
                   <span className="leading-tight">
                     <span className="block text-sm font-semibold text-white">Schedule later</span>
                     <span className="block text-[11px] text-[#8a8a8a]">Pick a date &amp; share a link</span>
                   </span>
-                </button>
+                </Link>
               </div>
             </div>
           )}
@@ -206,7 +216,7 @@ export default function SchedulePage() {
         </div>
       )}
 
-      {!loading && !error && interviews.length === 0 && <EmptyState onCreate={() => setModal("new")} />}
+      {!loading && !error && interviews.length === 0 && <EmptyState />}
 
       {!loading && !error && interviews.length > 0 && (
         <>
@@ -282,7 +292,7 @@ export default function SchedulePage() {
  * Layout helpers
  * ------------------------------------------------------------------ */
 
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+function EmptyState() {
   return (
     <div className="rounded-2xl border border-dashed border-slate-300 bg-white/50 p-16 text-center dark:border-lc-border dark:bg-lc-surface/40">
       <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary">
@@ -290,13 +300,22 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
       </span>
       <p className="mt-4 text-base font-semibold text-slate-800 dark:text-[#eff1f6]">No interviews yet</p>
       <p className="mt-1 text-sm text-slate-500 dark:text-[#8a8a8a]">Create your first interview to generate a candidate link.</p>
-      <button
-        onClick={onCreate}
-        className="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-night transition hover:bg-primary-dark"
-      >
-        <span className="material-symbols-outlined text-[18px]">add</span>
-        New interview
-      </button>
+      <div className="mt-5 flex items-center justify-center gap-2.5">
+        <Link
+          href="/instant"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-slate-300 dark:border-lc-border dark:text-[#ccc] dark:hover:border-[#555]"
+        >
+          <span className="material-symbols-outlined text-[18px]">bolt</span>
+          Instant
+        </Link>
+        <Link
+          href="/later"
+          className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-night transition hover:bg-primary-dark"
+        >
+          <span className="material-symbols-outlined text-[18px]">add</span>
+          New interview
+        </Link>
+      </div>
     </div>
   );
 }

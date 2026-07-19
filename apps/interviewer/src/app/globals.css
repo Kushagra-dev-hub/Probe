@@ -36,13 +36,15 @@ html {
   --color-bg-dark: #03001C;
   --color-editor-bg: #150d33;
 
-  /* Surfaces (kept under the legacy lc-* names so existing markup re-skins) */
+  /* Surfaces (kept under the legacy lc-* names so existing markup re-skins).
+     Darkened toward black — same night/grape hue family, much less saturated
+     purple than the original values. */
   --color-lc-bg: #03001C;
-  --color-lc-surface: #1c1140;
-  --color-lc-border: #3a2c63;
-  --color-lc-hover: #2a1a52;
-  --color-lc-input: #170e36;
-  --color-lc-elevated: #2a1a52;
+  --color-lc-surface: #0d0925;
+  --color-lc-border: #241c48;
+  --color-lc-hover: #150f36;
+  --color-lc-input: #0a0620;
+  --color-lc-elevated: #150f36;
 
   /* Accent */
   --color-indigo-accent: #B6EADA;
@@ -206,15 +208,15 @@ pre,
 
 /* Custom Scrollbar */
 :root {
-  --scrollbar-size: 8px;
-  --scrollbar-thumb: rgba(15, 23, 42, 0.18);
-  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.32);
+  --scrollbar-size: 11px;
+  --scrollbar-thumb: rgba(15, 23, 42, 0.32);
+  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.5);
   --scrollbar-track: transparent;
 }
 
 .dark {
-  --scrollbar-thumb: rgba(226, 232, 240, 0.18);
-  --scrollbar-thumb-hover: rgba(226, 232, 240, 0.32);
+  --scrollbar-thumb: rgba(226, 232, 240, 0.38);
+  --scrollbar-thumb-hover: rgba(226, 232, 240, 0.58);
 }
 
 * {

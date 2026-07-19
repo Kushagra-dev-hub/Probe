@@ -16,11 +16,11 @@
   --color-primary-dark: #97dcc9;
   --color-bg-light: #03001C;
   --color-lc-bg: #03001C;
-  --color-lc-surface: #1c1140;
-  --color-lc-border: #3a2c63;
-  --color-lc-hover: #2a1a52;
-  --color-lc-input: #170e36;
-  --color-lc-elevated: #2a1a52;
+  --color-lc-surface: #0d0925;
+  --color-lc-border: #241c48;
+  --color-lc-hover: #150f36;
+  --color-lc-input: #0a0620;
+  --color-lc-elevated: #150f36;
 
   /* Brand hues remapped to steel; semantic hues left default. */
   --color-blue-300: #a9c5de;
@@ -89,15 +89,15 @@ body.dark {
 }
 
 :root {
-  --scrollbar-size: 8px;
-  --scrollbar-thumb: rgba(15, 23, 42, 0.18);
-  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.32);
+  --scrollbar-size: 11px;
+  --scrollbar-thumb: rgba(15, 23, 42, 0.32);
+  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.5);
   --scrollbar-track: transparent;
 }
 
 .dark {
-  --scrollbar-thumb: rgba(226, 232, 240, 0.18);
-  --scrollbar-thumb-hover: rgba(226, 232, 240, 0.32);
+  --scrollbar-thumb: rgba(226, 232, 240, 0.38);
+  --scrollbar-thumb-hover: rgba(226, 232, 240, 0.58);
 }
 
 * {

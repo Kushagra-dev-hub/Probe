@@ -407,7 +407,7 @@ export function ScorecardView({
     }, [scorecard]);
 
     return (
-        <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-indigo-500/30 dark:bg-lc-surface">
+        <div>
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                     <span className="grid size-6 place-items-center rounded-md bg-indigo-600 text-[11px] font-bold text-white">P</span>
@@ -426,17 +426,17 @@ export function ScorecardView({
             <p className="mt-1 text-[11px] font-semibold text-slate-400">Drafted from the session log — every row cites the work. Review before you rely on it; Probe never makes the decision.</p>
 
             {!scorecard ? (
-                <p className="mt-4 rounded-lg bg-slate-50 p-4 text-sm font-semibold text-slate-500 dark:bg-lc-bg dark:text-slate-400">
+                <p className="mt-4 rounded-lg bg-slate-50 p-4 text-sm font-semibold text-slate-500 dark:bg-white/[0.03] dark:text-slate-400">
                     {generating ? "Reading the session log…" : "No scorecard yet — generate one from the session's code, runs, and answers."}
                 </p>
             ) : (
                 <>
-                    {scorecard.summary && <p className="mt-3 rounded-lg bg-indigo-50/60 p-3 text-sm font-medium leading-relaxed text-slate-700 dark:bg-indigo-500/10 dark:text-slate-200">{scorecard.summary}</p>}
+                    {scorecard.summary && <p className="mt-3 rounded-lg bg-indigo-50/60 p-3 text-sm font-medium leading-relaxed text-slate-700 dark:bg-white/[0.03] dark:text-slate-200">{scorecard.summary}</p>}
                     <div className="mt-3 space-y-2">
                         {scorecard.items.map((item) => {
                             const style = VERDICT_STYLE[item.verdict] ?? VERDICT_STYLE.unknown;
                             return (
-                                <div key={item.key} className="rounded-xl border border-slate-200 p-3 dark:border-lc-border">
+                                <div key={item.key} className="rounded-xl bg-slate-50 p-3 dark:bg-white/[0.03]">
                                     <div className="flex items-center justify-between gap-2">
                                         <p className="text-sm font-bold text-slate-900 dark:text-white">{item.title}</p>
                                         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold capitalize ${style.badge}`}>

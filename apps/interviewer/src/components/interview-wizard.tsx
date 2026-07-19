@@ -7,6 +7,8 @@ import { api, type InterviewRound, type InterviewSummary, type ResourcesResponse
 
 type Mode = "instant" | "later";
 
+const CANDIDATE_BASE = (process.env.NEXT_PUBLIC_CANDIDATE_URL || "http://localhost:3000").replace(/\/$/, "");
+
 const INPUT =
   "w-full rounded-lg border border-steel/25 bg-night/50 px-3 py-2 text-sm text-white placeholder:text-haze/50 focus:border-steel focus:outline-none focus:ring-1 focus:ring-steel/30";
 
@@ -64,6 +66,7 @@ export function InterviewWizard({ mode }: { mode: Mode }) {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<InterviewSummary | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -119,15 +122,12 @@ export function InterviewWizard({ mode }: { mode: Mode }) {
       jdText,
     };
     try {
-      const created = await api.post<InterviewSummary>("/interviews", payload, token);
-      if (mode === "instant") {
-        router.push(`/interview/${created.id}/room?token=${token ?? ""}`);
-      } else {
-        router.push("/dashboard");
-      }
+      const result = await api.post<InterviewSummary>("/interviews", payload, token);
       router.refresh();
+      setCreated(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
       setSubmitting(false);
     }
   }
@@ -396,6 +396,103 @@ export function InterviewWizard({ mode }: { mode: Mode }) {
             Continue
           </button>
         )}
+      </div>
+
+      {created && (
+        <CreatedModal
+          mode={mode}
+          interview={created}
+          token={token}
+          onEnterRoom={() => router.push(`/interview/${created.id}/room?token=${token ?? ""}`)}
+          onDone={() => router.push("/dashboard")}
+        />
+      )}
+    </div>
+  );
+}
+
+function CreatedModal({
+  mode,
+  interview,
+  token,
+  onEnterRoom,
+  onDone,
+}: {
+  mode: Mode;
+  interview: InterviewSummary;
+  token?: string;
+  onEnterRoom: () => void;
+  onDone: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const link = interview.shareToken ? `${CANDIDATE_BASE}/join/${interview.shareToken}` : "";
+
+  async function copy() {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* clipboard blocked — no-op */
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && onDone()}>
+      <div className="w-full max-w-md rounded-2xl bg-lc-surface p-7 text-center shadow-2xl ring-1 ring-white/10">
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-500/15 text-emerald-400">
+          <span className="material-symbols-outlined text-[30px]">check_circle</span>
+        </span>
+        <h2 className="mt-4 text-xl font-extrabold text-white">Interview created</h2>
+        <p className="mt-1 text-sm text-haze/60">
+          Send this link to <span className="font-semibold text-white">{interview.interviewee.name}</span> to let them join.
+        </p>
+
+        {link ? (
+          <div className="mt-5 flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 p-2 pl-3.5">
+            <span className="material-symbols-outlined text-[18px] text-haze/50">link</span>
+            <input
+              readOnly
+              value={link}
+              onFocus={(e) => e.currentTarget.select()}
+              className="min-w-0 flex-1 bg-transparent text-sm text-haze/80 focus:outline-none"
+            />
+            <button
+              onClick={copy}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                copied ? "bg-emerald-500 text-night" : "bg-mint text-night hover:bg-primary-dark"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px]">{copied ? "check" : "content_copy"}</span>
+              {copied ? "Copied!" : "Copy"}
+            </button>
+          </div>
+        ) : (
+          <p className="mt-5 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-300">
+            Created, but no share link was returned.
+          </p>
+        )}
+
+        <p className="mt-3 text-xs text-haze/40">The candidate opens this link to enter the lobby. You admit them from the room.</p>
+
+        <div className="mt-6 flex items-center gap-2.5">
+          <button
+            onClick={onDone}
+            className="flex-1 rounded-xl bg-white/[0.06] py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+          >
+            {mode === "instant" ? "Not now" : "Done"}
+          </button>
+          {mode === "instant" && token && (
+            <button
+              onClick={onEnterRoom}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-mint py-2.5 text-sm font-semibold text-night transition hover:bg-primary-dark"
+            >
+              <span className="material-symbols-outlined text-[18px]">videocam</span>
+              Enter room
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

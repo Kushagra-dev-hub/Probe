@@ -1248,8 +1248,8 @@ function InterviewerRoom() {
     if (sessionEnded || ended || status === "completed") {
         return (
             <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#FAFBFC] px-4 py-10 dark:bg-lc-bg">
-                <div className="mx-auto max-w-2xl">
-                    <div className="mb-6 flex items-center gap-3">
+                <div className="mx-auto max-w-5xl">
+                    <div className="mb-8 flex items-center gap-3">
                         <div className="grid size-11 place-items-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
                             <span className="material-symbols-outlined text-[24px]">task_alt</span>
                         </div>
@@ -1259,93 +1259,97 @@ function InterviewerRoom() {
                         </div>
                     </div>
 
-                    <div className="mb-6">
-                        <ScorecardView
-                            scorecard={copilotScorecard}
-                            generating={scorecardGenerating}
-                            onGenerate={generateScorecard}
-                            onCopyToEvaluation={({ strengths, concerns, notes }) => {
-                                if (strengths.length) setEvaluationStrengths((list) => Array.from(new Set([...list, ...strengths])).slice(0, 12));
-                                if (concerns.length) setEvaluationConcerns((list) => Array.from(new Set([...list, ...concerns])).slice(0, 12));
-                                if (notes) setEvaluationNotes((current) => (current ? current : notes));
-                            }}
-                        />
-                    </div>
-
-                    <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-lc-border dark:bg-lc-surface">
-                        <div>
-                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Recommendation</label>
-                            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                {RECOMMENDATION_OPTIONS.map((option) => {
-                                    const active = evaluationRecommendation === option.value;
-                                    return (
-                                        <button key={option.value} type="button" onClick={() => setEvaluationRecommendation(option.value)} className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-bold transition-colors ${active ? option.activeClass : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-bg"}`}>
-                                            <span className="material-symbols-outlined text-[16px]">{option.icon}</span>
-                                            {option.label}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                    {/* Two columns, blended into the page, separated by a thin divider:
+                        left = the copilot's read of the session, right = the form you fill. */}
+                    <div className="grid gap-8 lg:grid-cols-[3fr_2fr] lg:divide-x lg:divide-slate-200 dark:lg:divide-white/[0.08]">
+                        <div className="lg:pr-8">
+                            <ScorecardView
+                                scorecard={copilotScorecard}
+                                generating={scorecardGenerating}
+                                onGenerate={generateScorecard}
+                                onCopyToEvaluation={({ strengths, concerns, notes }) => {
+                                    if (strengths.length) setEvaluationStrengths((list) => Array.from(new Set([...list, ...strengths])).slice(0, 12));
+                                    if (concerns.length) setEvaluationConcerns((list) => Array.from(new Set([...list, ...concerns])).slice(0, 12));
+                                    if (notes) setEvaluationNotes((current) => (current ? current : notes));
+                                }}
+                            />
                         </div>
 
-                        <div>
-                            <div className="flex items-center justify-between">
-                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Score</label>
-                                <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">{evaluationScore === "" ? "—" : evaluationScore}<span className="text-slate-400">/100</span></span>
-                            </div>
-                            <input type="range" min={0} max={100} value={evaluationScore === "" ? 0 : Number(evaluationScore)} onChange={(event) => setEvaluationScore(event.target.value)} className="mt-2 w-full cursor-pointer accent-primary" />
-                        </div>
-
-                        <div>
-                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Strengths</label>
-                            <div className="mt-2 flex gap-2">
-                                <input value={strengthInput} onChange={(event) => setStrengthInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addStrength(); } }} placeholder="Add a strength and press Enter" className="h-10 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 dark:border-lc-border dark:bg-lc-bg dark:text-slate-200" />
-                                <button type="button" onClick={addStrength} className="rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-bg">Add</button>
-                            </div>
-                            {evaluationStrengths.length > 0 && (
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                    {evaluationStrengths.map((item) => (
-                                        <span key={item} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
-                                            {item}
-                                            <button type="button" onClick={() => setEvaluationStrengths((list) => list.filter((value) => value !== item))} className="text-emerald-500 hover:text-emerald-700"><span className="material-symbols-outlined text-[14px]">close</span></button>
-                                        </span>
-                                    ))}
+                        <div className="space-y-5 pt-8 lg:pt-0 lg:pl-8">
+                            <div>
+                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Recommendation</label>
+                                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                    {RECOMMENDATION_OPTIONS.map((option) => {
+                                        const active = evaluationRecommendation === option.value;
+                                        return (
+                                            <button key={option.value} type="button" onClick={() => setEvaluationRecommendation(option.value)} className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-bold transition-colors ${active ? option.activeClass : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-bg"}`}>
+                                                <span className="material-symbols-outlined text-[16px]">{option.icon}</span>
+                                                {option.label}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Areas of concern</label>
-                            <div className="mt-2 flex gap-2">
-                                <input value={concernInput} onChange={(event) => setConcernInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addConcern(); } }} placeholder="Add a concern and press Enter" className="h-10 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 dark:border-lc-border dark:bg-lc-bg dark:text-slate-200" />
-                                <button type="button" onClick={addConcern} className="rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-bg">Add</button>
                             </div>
-                            {evaluationConcerns.length > 0 && (
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                    {evaluationConcerns.map((item) => (
-                                        <span key={item} className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700 dark:bg-red-500/10 dark:text-red-400">
-                                            {item}
-                                            <button type="button" onClick={() => setEvaluationConcerns((list) => list.filter((value) => value !== item))} className="text-red-500 hover:text-red-700"><span className="material-symbols-outlined text-[14px]">close</span></button>
-                                        </span>
-                                    ))}
+
+                            <div>
+                                <div className="flex items-center justify-between">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Score</label>
+                                    <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">{evaluationScore === "" ? "—" : evaluationScore}<span className="text-slate-400">/100</span></span>
                                 </div>
-                            )}
-                        </div>
+                                <input type="range" min={0} max={100} value={evaluationScore === "" ? 0 : Number(evaluationScore)} onChange={(event) => setEvaluationScore(event.target.value)} className="mt-2 w-full cursor-pointer accent-primary" />
+                            </div>
 
-                        <div>
-                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Summary / feedback</label>
-                            <textarea value={evaluationNotes} onChange={(event) => setEvaluationNotes(event.target.value)} placeholder="Overall assessment of the candidate's performance…" className="mt-2 min-h-32 w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold leading-6 text-slate-700 placeholder:font-normal dark:border-lc-border dark:bg-lc-bg dark:text-slate-200" />
-                        </div>
-                    </div>
+                            <div>
+                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Strengths</label>
+                                <div className="mt-2 flex gap-2">
+                                    <input value={strengthInput} onChange={(event) => setStrengthInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addStrength(); } }} placeholder="Add a strength and press Enter" className="h-10 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 dark:border-lc-border dark:bg-lc-bg dark:text-slate-200" />
+                                    <button type="button" onClick={addStrength} className="rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-bg">Add</button>
+                                </div>
+                                {evaluationStrengths.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {evaluationStrengths.map((item) => (
+                                            <span key={item} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                                                {item}
+                                                <button type="button" onClick={() => setEvaluationStrengths((list) => list.filter((value) => value !== item))} className="text-emerald-500 hover:text-emerald-700"><span className="material-symbols-outlined text-[14px]">close</span></button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
 
-                    <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                        <button type="button" onClick={() => finishInterview(false)} disabled={finishing} className="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-60 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-surface">
-                            Skip &amp; go to candidates
-                        </button>
-                        <button type="button" onClick={() => finishInterview(true)} disabled={finishing} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-night transition-colors hover:bg-primary-dark disabled:cursor-wait disabled:opacity-70">
-                            <span className={`material-symbols-outlined text-[18px] ${finishing ? "animate-spin" : ""}`}>{finishing ? "progress_activity" : "save"}</span>
-                            {finishing ? "Saving…" : "Save & go to candidates"}
-                        </button>
+                            <div>
+                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Areas of concern</label>
+                                <div className="mt-2 flex gap-2">
+                                    <input value={concernInput} onChange={(event) => setConcernInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addConcern(); } }} placeholder="Add a concern and press Enter" className="h-10 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 dark:border-lc-border dark:bg-lc-bg dark:text-slate-200" />
+                                    <button type="button" onClick={addConcern} className="rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-bg">Add</button>
+                                </div>
+                                {evaluationConcerns.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {evaluationConcerns.map((item) => (
+                                            <span key={item} className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700 dark:bg-red-500/10 dark:text-red-400">
+                                                {item}
+                                                <button type="button" onClick={() => setEvaluationConcerns((list) => list.filter((value) => value !== item))} className="text-red-500 hover:text-red-700"><span className="material-symbols-outlined text-[14px]">close</span></button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Summary / feedback</label>
+                                <textarea value={evaluationNotes} onChange={(event) => setEvaluationNotes(event.target.value)} placeholder="Overall assessment of the candidate's performance…" className="mt-2 min-h-32 w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold leading-6 text-slate-700 placeholder:font-normal dark:border-lc-border dark:bg-lc-bg dark:text-slate-200" />
+                            </div>
+
+                            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                <button type="button" onClick={() => finishInterview(false)} disabled={finishing} className="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-60 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-surface">
+                                    Skip &amp; go to candidates
+                                </button>
+                                <button type="button" onClick={() => finishInterview(true)} disabled={finishing} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-night transition-colors hover:bg-primary-dark disabled:cursor-wait disabled:opacity-70">
+                                    <span className={`material-symbols-outlined text-[18px] ${finishing ? "animate-spin" : ""}`}>{finishing ? "progress_activity" : "save"}</span>
+                                    {finishing ? "Saving…" : "Save & go to candidates"}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1381,11 +1385,11 @@ function InterviewerRoom() {
                         </div>
                     </div>
 
-                    {/* Running interview timer — centered, red, HH:MM:SS since admit. */}
+                    {/* Running interview timer — centered, green, HH:MM:SS since admit. */}
                     <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2">
-                        <span className={`material-symbols-outlined text-[19px] ${admitted ? "text-red-500" : "text-slate-400"}`}>timer</span>
-                        <span className={`font-mono text-[17px] font-black tabular-nums ${admitted ? "text-red-500" : "text-slate-400"}`}>{admitted ? formatElapsed(runningElapsed) : "00:00:00"}</span>
-                        {admitted && <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-red-400 opacity-75" /><span className="relative inline-flex size-2 rounded-full bg-red-500" /></span>}
+                        <span className={`material-symbols-outlined text-[19px] ${admitted ? "text-emerald-500" : "text-slate-400"}`}>timer</span>
+                        <span className={`font-mono text-[17px] font-black tabular-nums ${admitted ? "text-emerald-500" : "text-slate-400"}`}>{admitted ? formatElapsed(runningElapsed) : "00:00:00"}</span>
+                        {admitted && <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex size-2 rounded-full bg-emerald-500" /></span>}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -1784,10 +1788,10 @@ function InterviewerRoom() {
                                 className={`fixed z-50 touch-none select-none overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl ${meetActive ? "" : "w-64"}`}
                                 style={
                                     meetActive
-                                        ? { left: 16, top: 72, right: 400, bottom: 96 }
+                                        ? { left: 16, top: 72, right: (panelCollapsed ? 52 : rightWidth) + 16, bottom: 96 }
                                         : videoPosition
                                             ? { left: videoPosition.left, top: videoPosition.top, cursor: "grab" }
-                                            : { right: 408, top: 80, cursor: "grab" }
+                                            : { right: (panelCollapsed ? 52 : rightWidth) + 8, top: 80, cursor: "grab" }
                                 }
                                 title={meetActive ? undefined : "Drag to reposition. Click to enable audio."}
                                 onPointerDown={(event) => {

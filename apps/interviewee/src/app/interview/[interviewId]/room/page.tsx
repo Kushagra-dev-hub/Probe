@@ -1109,11 +1109,11 @@ function CandidateRoom() {
                     </div>
                 </div>
 
-                {/* Running interview timer — centered, red, HH:MM:SS since admit. */}
+                {/* Running interview timer — centered, green, HH:MM:SS since admit. */}
                 <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2">
-                    <span className={`material-symbols-outlined text-[19px] ${admitted ? "text-red-500" : "text-slate-500"}`}>timer</span>
-                    <span className={`font-mono text-[17px] font-black tabular-nums ${admitted ? "text-red-500" : "text-slate-500"}`}>{admitted ? formatElapsed(runningElapsed) : "00:00:00"}</span>
-                    {admitted && <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-red-400 opacity-75" /><span className="relative inline-flex size-2 rounded-full bg-red-500" /></span>}
+                    <span className={`material-symbols-outlined text-[19px] ${admitted ? "text-emerald-500" : "text-slate-500"}`}>timer</span>
+                    <span className={`font-mono text-[17px] font-black tabular-nums ${admitted ? "text-emerald-500" : "text-slate-500"}`}>{admitted ? formatElapsed(runningElapsed) : "00:00:00"}</span>
+                    {admitted && <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex size-2 rounded-full bg-emerald-500" /></span>}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -1165,14 +1165,7 @@ function CandidateRoom() {
             )}
 
             <main className="relative min-h-0 flex-1 overflow-hidden">
-                {isMeet ? (
-                    <div className="absolute inset-0 grid place-items-center">
-                        <div className="pointer-events-none absolute left-1/2 top-6 -translate-x-1/2 text-center">
-                            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">You are live with</p>
-                            <p className="text-sm font-bold text-slate-200">{bootstrap?.interviewer.name || "your interviewer"}</p>
-                        </div>
-                    </div>
-                ) : (
+                {!isMeet && (
                     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#FAFBFC] text-slate-900 dark:bg-lc-bg dark:text-white xl:flex-row">
                         <aside style={{ "--left-w": `${leftWidth}px` } as React.CSSProperties} className="flex w-full shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white dark:border-lc-border dark:bg-lc-surface xl:w-[var(--left-w)]">
                             <div className="flex items-center gap-1 border-b border-slate-100 px-4 dark:border-lc-border">
