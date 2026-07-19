@@ -340,7 +340,7 @@ export default function LandingPage() {
   const router = useRouter();
   const { user } = useAuth();
 
-  const goNew = () => router.push("/new");
+  const goNew = () => router.push("/later");
 
   const scrollTo = (hash: string) => {
     const target = document.querySelector(hash);

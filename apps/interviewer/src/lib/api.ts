@@ -12,7 +12,9 @@ async function request<T>(path: string, token?: string, init?: RequestInit): Pro
   const res = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      // Only advertise a JSON body when one is actually sent — Fastify rejects a
+      // Content-Type of application/json with an empty body (e.g. DELETE requests).
+      ...(init?.body != null ? { "Content-Type": "application/json" } : {}),
       ...(init?.headers || {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
@@ -75,6 +77,35 @@ export type InterviewSummary = {
 export type InterviewListResponse = {
   role: "interviewer" | "interviewee";
   interviews: InterviewSummary[];
+};
+
+export type InterviewReport = {
+  interview: {
+    id: string;
+    status: string;
+    scheduledAt: string | null;
+    durationMinutes: number;
+    startedAt: string | null;
+    endedAt: string | null;
+    rounds: InterviewRound[];
+    roleTitle: string | null;
+    companyName: string | null;
+    interviewer: { id: string; name: string; email: string | null };
+    interviewee: { id: string; name: string; email: string | null; avatarUrl: string | null };
+  };
+  evaluation: {
+    score: number | null;
+    recommendation: string;
+    strengths: string[];
+    concerns: string[];
+    notes: string | null;
+    updatedAt: string;
+  } | null;
+  scorecard: {
+    summary: string | null;
+    items: { key?: string; title: string; verdict: string; evidence?: string[]; note?: string }[];
+    generatedAt?: string;
+  } | null;
 };
 
 export type ResourcesResponse = {

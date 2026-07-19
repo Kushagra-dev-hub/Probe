@@ -12,7 +12,9 @@ async function request<T>(path: string, token?: string, init?: RequestInit): Pro
   const res = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      // Only advertise a JSON body when one is actually sent — Fastify rejects a
+      // Content-Type of application/json with an empty body (e.g. DELETE requests).
+      ...(init?.body != null ? { "Content-Type": "application/json" } : {}),
       ...(init?.headers || {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },

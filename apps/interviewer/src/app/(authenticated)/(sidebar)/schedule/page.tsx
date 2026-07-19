@@ -17,6 +17,7 @@ import {
   statusLabel,
   toLocalInputValue,
 } from "@/lib/format";
+import { ReportModal } from "@/components/report-modal";
 
 /* ------------------------------------------------------------------ *
  * Constants
@@ -92,6 +93,10 @@ export default function SchedulePage() {
   const [modal, setModal] = useState<"new" | InterviewSummary | null>(null);
   // Share link surfaced after a successful create.
   const [createdLink, setCreatedLink] = useState<{ link: string; name: string } | null>(null);
+  // Which list is shown — upcoming vs past.
+  const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
+  // Past interview whose filled report is open, if any.
+  const [reportId, setReportId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -149,14 +154,38 @@ export default function SchedulePage() {
             Schedule sessions, share candidate links, and jump into the room.
           </p>
         </div>
-        <button
-          onClick={() => setModal("new")}
-          disabled={Boolean(wrongRole)}
-          className="group inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-night shadow-lg shadow-primary/25 transition hover:bg-primary-dark hover:shadow-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <span className="material-symbols-outlined text-[20px] transition-transform group-hover:rotate-90">add</span>
-          New interview
-        </button>
+        {/* New interview — hover reveals Instant / Later; a plain click defaults to Later (modal) */}
+        <div className="group relative">
+          <button
+            onClick={() => setModal("new")}
+            disabled={Boolean(wrongRole)}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-night shadow-lg shadow-primary/25 transition hover:bg-primary-dark hover:shadow-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[20px]">add</span>
+            New interview
+            <span className="material-symbols-outlined text-[18px] transition-transform group-hover:rotate-180">expand_more</span>
+          </button>
+          {!wrongRole && (
+            <div className="invisible absolute right-0 top-full z-50 translate-y-1 pt-2 opacity-0 transition-all duration-150 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+              <div className="w-56 overflow-hidden rounded-xl border border-white/10 bg-lc-surface p-1 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)]">
+                <button onClick={() => setModal("new")} className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2.5 text-left transition hover:bg-white/5">
+                  <span className="material-symbols-outlined mt-0.5 text-[19px] text-mint">bolt</span>
+                  <span className="leading-tight">
+                    <span className="block text-sm font-semibold text-white">Instant interview</span>
+                    <span className="block text-[11px] text-[#8a8a8a]">Start a room right now</span>
+                  </span>
+                </button>
+                <button onClick={() => setModal("new")} className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2.5 text-left transition hover:bg-white/5">
+                  <span className="material-symbols-outlined mt-0.5 text-[19px] text-steel">calendar_month</span>
+                  <span className="leading-tight">
+                    <span className="block text-sm font-semibold text-white">Schedule later</span>
+                    <span className="block text-[11px] text-[#8a8a8a]">Pick a date &amp; share a link</span>
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </header>
 
       {wrongRole && (
@@ -179,20 +208,47 @@ export default function SchedulePage() {
 
       {!loading && !error && interviews.length === 0 && <EmptyState onCreate={() => setModal("new")} />}
 
-      {!loading && !error && upcoming.length > 0 && (
-        <Section title="Upcoming" count={upcoming.length}>
-          {upcoming.map((i) => (
-            <InterviewCard key={i.id} interview={i} token={token} onEdit={() => setModal(i)} onChanged={load} />
-          ))}
-        </Section>
-      )}
+      {!loading && !error && interviews.length > 0 && (
+        <>
+          {/* Upcoming / Past toggle */}
+          <div className="mb-6 inline-flex items-center gap-1 rounded-full bg-white/[0.04] p-1 text-sm font-semibold">
+            {(["upcoming", "past"] as const).map((t) => {
+              const count = t === "upcoming" ? upcoming.length : past.length;
+              const active = tab === t;
+              return (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 capitalize transition ${
+                    active ? "bg-white/10 text-white" : "text-haze/55 hover:text-white"
+                  }`}
+                >
+                  {t}
+                  <span className={`grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] ${active ? "bg-mint/20 text-mint" : "bg-white/10 text-haze/55"}`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
-      {!loading && !error && past.length > 0 && (
-        <Section title="Past" count={past.length}>
-          {past.map((i) => (
-            <InterviewCard key={i.id} interview={i} token={token} onEdit={() => setModal(i)} onChanged={load} />
-          ))}
-        </Section>
+          {(tab === "upcoming" ? upcoming : past).length === 0 ? (
+            <p className="py-16 text-center text-sm text-haze/40">No {tab} interviews.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {(tab === "upcoming" ? upcoming : past).map((i) => (
+                <InterviewCard
+                  key={i.id}
+                  interview={i}
+                  token={token}
+                  onEdit={() => setModal(i)}
+                  onChanged={load}
+                  onViewReport={tab === "past" ? () => setReportId(i.id) : undefined}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Modals */}
@@ -215,6 +271,8 @@ export default function SchedulePage() {
 
       {createdLink && <SuccessModal link={createdLink.link} name={createdLink.name} onClose={() => setCreatedLink(null)} />}
 
+      {reportId && token && <ReportModal interviewId={reportId} token={token} onClose={() => setReportId(null)} />}
+
       <ModalStyles />
     </div>
   );
@@ -223,20 +281,6 @@ export default function SchedulePage() {
 /* ------------------------------------------------------------------ *
  * Layout helpers
  * ------------------------------------------------------------------ */
-
-function Section({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
-  return (
-    <section className="mb-10">
-      <div className="mb-4 flex items-center gap-2.5">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-[#8a8a8a]">{title}</h2>
-        <span className="grid h-5 min-w-5 place-items-center rounded-full bg-slate-100 px-1.5 text-[11px] font-semibold text-slate-500 dark:bg-lc-hover dark:text-[#aaa]">
-          {count}
-        </span>
-      </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{children}</div>
-    </section>
-  );
-}
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
@@ -261,10 +305,7 @@ function CardSkeletons() {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div
-          key={i}
-          className="h-52 animate-pulse rounded-2xl border border-slate-200 bg-white dark:border-lc-border dark:bg-lc-surface"
-        />
+        <div key={i} className="h-52 animate-pulse rounded-2xl bg-white/[0.03]" />
       ))}
     </div>
   );
@@ -279,15 +320,18 @@ function InterviewCard({
   token,
   onEdit,
   onChanged,
+  onViewReport,
 }: {
   interview: InterviewSummary;
   token?: string;
   onEdit: () => void;
   onChanged: () => void;
+  onViewReport?: () => void;
 }) {
   const readiness = interviewReadiness(interview);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const roomUrl = `/interview/${interview.id}/room?token=${token ?? ""}`;
   const shareLink = interview.shareToken ? `${CANDIDATE_BASE}/join/${interview.shareToken}` : null;
@@ -307,8 +351,8 @@ function InterviewCard({
 
   async function remove() {
     if (!token) return;
-    if (!confirm("Delete this interview permanently? This cannot be undone.")) return;
     setBusy(true);
+    setConfirming(false);
     try {
       await api.del(`/interviews/${interview.id}`, token);
       onChanged();
@@ -322,7 +366,10 @@ function InterviewCard({
   const rec = interview.evaluation && interview.evaluation.recommendation !== "pending" ? interview.evaluation : null;
 
   return (
-    <div className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md dark:border-lc-border dark:bg-lc-surface dark:hover:border-[#4a4a4a]">
+    <div
+      onClick={onViewReport}
+      className={`group flex flex-col rounded-2xl p-5 transition hover:bg-white/[0.03] ${onViewReport ? "cursor-pointer" : ""}`}
+    >
       {/* Top row: title + status */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -402,7 +449,18 @@ function InterviewCard({
 
       {/* Actions */}
       <div className="mt-5 flex items-center gap-1.5 border-t border-slate-100 pt-4 dark:border-lc-border">
-        {readiness.canJoin ? (
+        {onViewReport ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewReport();
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-night transition hover:bg-primary-dark"
+          >
+            <span className="material-symbols-outlined text-[18px]">description</span>
+            View report
+          </button>
+        ) : readiness.canJoin ? (
           <Link
             href={roomUrl}
             className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
@@ -423,7 +481,10 @@ function InterviewCard({
         <div className="ml-auto flex items-center gap-1">
           {shareLink && (
             <button
-              onClick={copyLink}
+              onClick={(e) => {
+                e.stopPropagation();
+                void copyLink();
+              }}
               title="Copy candidate link"
               className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition ${
                 copied
@@ -437,21 +498,58 @@ function InterviewCard({
           )}
           {!readiness.isTerminal && (
             <button
-              onClick={onEdit}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
               title="Edit interview"
               className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-[#aaa] dark:hover:bg-lc-hover"
             >
               <span className="material-symbols-outlined text-[18px]">edit</span>
             </button>
           )}
-          <button
-            onClick={remove}
-            disabled={busy}
-            title="Delete interview"
-            className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 dark:text-[#aaa] dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
-          >
-            <span className="material-symbols-outlined text-[18px]">delete</span>
-          </button>
+          {confirming ? (
+            <span className="inline-flex items-center gap-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void remove();
+                }}
+                disabled={busy}
+                title="Confirm delete"
+                className="inline-flex items-center gap-1 rounded-lg bg-rose-500/15 px-2.5 py-2 text-xs font-semibold text-rose-400 transition hover:bg-rose-500/25 disabled:opacity-40"
+              >
+                {busy ? (
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-rose-400/40 border-t-rose-400" />
+                ) : (
+                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                )}
+                Delete
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfirming(false);
+                }}
+                title="Cancel"
+                className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-[#aaa] dark:hover:bg-lc-hover"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </span>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setConfirming(true);
+              }}
+              disabled={busy}
+              title="Delete interview"
+              className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 dark:text-[#aaa] dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+            >
+              <span className="material-symbols-outlined text-[18px]">delete</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

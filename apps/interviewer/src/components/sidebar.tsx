@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "@/context/sidebar-context";
-import { useState } from "react";
 
 const NAV_ITEMS = [
     { href: "/dashboard", label: "Dashboard", icon: "dashboard", activeAlso: [] as string[] },
@@ -13,35 +12,26 @@ const NAV_ITEMS = [
 export default function Sidebar() {
     const pathname = usePathname();
     const { isCollapsed } = useSidebar();
-    const [isHovered, setIsHovered] = useState(false);
-
-    const expanded = !isCollapsed || isHovered;
+    const expanded = !isCollapsed;
 
     return (
+        // Wrapper reserves layout width only when open, so content reclaims the
+        // full page when collapsed (Google Meet style — no leftover icon rail).
         <div
-            className={`hidden md:block relative z-[90] h-full shrink-0 transition-[width] duration-300 ${isCollapsed ? "w-[72px]" : "w-[200px]"}`}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
+            className={`hidden md:block shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out ${expanded ? "w-[220px]" : "w-0"}`}
         >
-            <aside
-                className={`
-                    absolute top-0 left-0 z-[90] h-full flex flex-col transition-all duration-300 overflow-hidden bg-white dark:bg-lc-surface
-                    ${expanded ? "w-[200px] border-r border-slate-200 dark:border-lc-border shadow-[4px_0_24px_-8px_rgba(0,0,0,0.1)] dark:shadow-[4px_0_24px_-8px_rgba(0,0,0,0.5)]" : "w-[72px] border-r border-slate-200 dark:border-lc-border"}
-                    ${!isCollapsed ? "!shadow-none" : ""}
-                `}
-            >
-                {/* Nav */}
-                <nav className="flex-1 px-3 py-4 space-y-1 overflow-x-hidden w-[200px]">
+            {/* Blends into the page: same background, no border, no shadow. */}
+            <aside className="h-full w-[220px] flex flex-col bg-transparent">
+                <nav className="flex-1 px-3 py-4 space-y-1 overflow-x-hidden">
                     {NAV_ITEMS.map((item) => {
                         const isActive = pathname === item.href || pathname.startsWith(item.href + "/") || (item.activeAlso?.some(p => pathname === p || pathname.startsWith(p + "/")));
                         return (
                             <Link
                                 key={item.href}
                                 href={item.href}
-                                title={!expanded ? item.label : undefined}
-                                className={`flex items-center gap-3 py-2.5 rounded-lg text-sm font-medium font-nunito transition-colors whitespace-nowrap px-3 ${isActive
+                                className={`flex items-center gap-3 py-2.5 px-4 rounded-full text-sm font-medium font-nunito transition-colors whitespace-nowrap ${isActive
                                         ? "bg-primary/10 text-primary"
-                                        : "text-slate-600 dark:text-[#8a8a8a] hover:bg-slate-50 dark:hover:bg-lc-hover hover:text-slate-900 dark:hover:text-[#ccc]"
+                                        : "text-slate-600 dark:text-[#8a8a8a] hover:bg-slate-100 dark:hover:bg-lc-hover hover:text-slate-900 dark:hover:text-[#ccc]"
                                     }`}
                             >
                                 <span
@@ -50,11 +40,7 @@ export default function Sidebar() {
                                 >
                                     {item.icon}
                                 </span>
-                                <span
-                                    className={`transition-all duration-300 ${!expanded ? "opacity-0 w-0 -translate-x-4 ml-0" : "opacity-100 w-auto translate-x-0"}`}
-                                >
-                                    {item.label}
-                                </span>
+                                <span>{item.label}</span>
                             </Link>
                         );
                     })}

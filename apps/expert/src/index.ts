@@ -534,6 +534,53 @@ app.get<{ Params: { id: string } }>("/interviews/:id/copilot", async (req, reply
   };
 });
 
+// The interviewer's filled evaluation ("report") for a past interview, plus the
+// copilot's assistive scorecard. Owner-only — the candidate never sees this.
+app.get<{ Params: { id: string } }>("/interviews/:id/report", async (req, reply) => {
+  const authed = await requireUser(req, reply);
+  if (!authed) return;
+  const interview = await prisma.interview.findUnique({
+    where: { id: req.params.id },
+    include: {
+      interviewer: { select: { id: true, name: true, email: true } },
+      interviewee: { select: { id: true, name: true, email: true, avatarUrl: true } },
+      evaluation: true,
+    },
+  });
+  if (!interview) return reply.code(404).send({ message: "Interview not found." });
+  if (interview.interviewerId !== authed.id) return reply.code(403).send({ message: "This report is interviewer-only." });
+
+  const scorecard = await getScorecard(interview.id).catch(() => null);
+  const ev = interview.evaluation;
+
+  return {
+    interview: {
+      id: interview.id,
+      status: interview.status,
+      scheduledAt: interview.scheduledAt?.toISOString() ?? null,
+      durationMinutes: interview.durationMinutes,
+      startedAt: interview.startedAt?.toISOString() ?? null,
+      endedAt: interview.endedAt?.toISOString() ?? null,
+      rounds: interview.rounds ?? [],
+      roleTitle: interview.roleTitle,
+      companyName: interview.companyName,
+      interviewer: interview.interviewer,
+      interviewee: interview.interviewee,
+    },
+    evaluation: ev
+      ? {
+          score: ev.score,
+          recommendation: ev.recommendation,
+          strengths: ev.strengths,
+          concerns: ev.concerns,
+          notes: ev.notes,
+          updatedAt: ev.updatedAt.toISOString(),
+        }
+      : null,
+    scorecard,
+  };
+});
+
 // Resume payload for the interviewer's resume panel (interviewer-only).
 app.get<{ Params: { id: string } }>("/interviews/:id/resume", async (req, reply) => {
   const authed = await requireUser(req, reply);
