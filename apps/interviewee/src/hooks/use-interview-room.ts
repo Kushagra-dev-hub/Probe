@@ -371,6 +371,17 @@ export function useInterviewRoom(identifier: string) {
         });
     }, []);
 
+    // Server-side Deepgram transcription: open a stream, push raw PCM frames, close it.
+    const startAudio = useCallback((speaker: "interviewer" | "interviewee") => {
+        socketRef.current?.emit("direct:audio-start", { interviewId: identifierRef.current, speaker });
+    }, []);
+    const sendAudioChunk = useCallback((chunk: ArrayBuffer) => {
+        socketRef.current?.emit("direct:audio-chunk", chunk);
+    }, []);
+    const stopAudio = useCallback(() => {
+        socketRef.current?.emit("direct:audio-stop", { interviewId: identifierRef.current });
+    }, []);
+
     // Interviewer marks the candidate's current answer complete → copilot analyzes it now.
     const analyzeAnswer = useCallback(() => {
         socketRef.current?.emit("direct:analyze-answer", { interviewId: identifierRef.current });
@@ -463,6 +474,9 @@ export function useInterviewRoom(identifier: string) {
         seedCopilotState,
         changeSurface,
         sendTranscript,
+        startAudio,
+        sendAudioChunk,
+        stopAudio,
         analyzeAnswer,
         reload: join,
     };

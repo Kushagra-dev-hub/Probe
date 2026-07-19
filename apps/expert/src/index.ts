@@ -19,6 +19,7 @@ import { hashPassword, verifyPassword } from "./lib/passwords.js";
 import { randomBytes } from "node:crypto";
 import { executePlainCode, executeAgainstTests, executeSql, extractSampleTests } from "./lib/judge0.js";
 import { listBankQuestions, getBankQuestion, pickRandomBankQuestions, type BankRound } from "./lib/bank.js";
+import { createDeepgramStream, deepgramAvailable, type DeepgramStream } from "./lib/deepgram.js";
 import { createRequire } from "node:module";
 import { mkdirSync, createWriteStream } from "node:fs";
 import { writeFile, readFile, readdir } from "node:fs/promises";
@@ -1166,19 +1167,65 @@ io.on("connection", (socket) => {
     ack?.({ ok: true });
   });
 
-  /* --- Live transcript intake (each browser transcribes its own mic) --- */
-  socket.on("direct:transcript", (p) => {
-    if (!p?.text?.trim()) return;
-    const speaker = (socket.data.role ?? "interviewee") as Role;
-    const entry = { interviewId: p.interviewId, speaker, text: p.text.trim(), isFinal: Boolean(p.isFinal), at: new Date().toISOString() };
+  /* --- Live transcript intake --- */
+  // Shared sink: broadcast to the interviewer-only panel + feed copilot memory.
+  const publishTranscript = (interviewId: string, speaker: Role, text: string, isFinal: boolean) => {
+    const clean = text.trim();
+    if (!clean) return;
+    const entry = { interviewId, speaker, text: clean, isFinal, at: new Date().toISOString() };
     // The live transcript is an interviewer-only panel; the candidate never sees it.
     void prisma.interview
-      .findUnique({ where: { id: p.interviewId }, select: { interviewerId: true } })
+      .findUnique({ where: { id: interviewId }, select: { interviewerId: true } })
       .then((row) => {
         if (row) io.to(userRoom(row.interviewerId)).emit("direct:transcript-entry", entry);
       })
       .catch(() => {});
-    if (entry.isFinal) noteTranscript(p.interviewId, { speaker, text: entry.text, at: entry.at });
+    if (isFinal) noteTranscript(interviewId, { speaker, text: clean, at: entry.at });
+  };
+
+  // Legacy path: browser Web Speech API sends finalized text directly (fallback
+  // for when server-side Deepgram is unavailable).
+  socket.on("direct:transcript", (p) => {
+    if (!p?.text?.trim()) return;
+    const speaker = (socket.data.role ?? "interviewee") as Role;
+    publishTranscript(p.interviewId, speaker, p.text, Boolean(p.isFinal));
+  });
+
+  /* --- Deepgram streaming: browser pushes raw PCM, expert transcribes it. --- */
+  let dgStream: DeepgramStream | null = null;
+  const closeDeepgram = () => {
+    dgStream?.close();
+    dgStream = null;
+  };
+
+  socket.on("direct:audio-start", ({ interviewId, speaker }) => {
+    if (!interviewId) return;
+    const role = (socket.data.role ?? speaker ?? "interviewee") as Role;
+    closeDeepgram();
+    if (!deepgramAvailable()) {
+      app.log.warn("Deepgram audio-start received but DEEPGRAM_API_KEY is not configured.");
+      return;
+    }
+    dgStream = createDeepgramStream({
+      onFinal: (text) => publishTranscript(interviewId, role, text, true),
+      onInterim: (text) => publishTranscript(interviewId, role, text, false),
+      onError: (message) => app.log.warn({ message }, "Deepgram stream error"),
+    });
+  });
+
+  socket.on("direct:audio-chunk", (chunk) => {
+    if (!dgStream || !chunk) return;
+    // socket.io delivers binary as Buffer/ArrayBuffer/Uint8Array — normalize to Buffer.
+    const buf = Buffer.isBuffer(chunk)
+      ? chunk
+      : chunk instanceof ArrayBuffer
+        ? Buffer.from(chunk)
+        : Buffer.from(chunk as unknown as Uint8Array);
+    dgStream.push(buf);
+  });
+
+  socket.on("direct:audio-stop", () => {
+    closeDeepgram();
   });
 
   // Interviewer pressed Enter → analyze the candidate's current answer immediately.
@@ -1219,6 +1266,7 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     // Room membership drops with the socket; clients re-emit join-session on reconnect.
     void lobbyName; // reserved for future lobby routing
+    closeDeepgram();
   });
 });
 

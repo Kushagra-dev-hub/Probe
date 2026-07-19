@@ -416,7 +416,9 @@ function CandidateRoom() {
         clearScreenShareRequest,
         clearScreenAnswer,
         clearScreenIce,
-        sendTranscript,
+        startAudio,
+        sendAudioChunk,
+        stopAudio,
         reload,
     } = useInterviewRoom(identifier);
 
@@ -1396,7 +1398,9 @@ function CandidateRoom() {
 
             <SpeechCapture
                 enabled={admitted && !isMuted && !sessionEnded}
-                onTranscript={(text, isFinal) => sendTranscript(text, isFinal, "interviewee")}
+                onStart={() => startAudio("interviewee")}
+                onAudio={sendAudioChunk}
+                onStop={stopAudio}
             />
         </div>
     );

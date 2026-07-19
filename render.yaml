@@ -6,7 +6,10 @@ services:
     region: oregon
     branch: main
     rootDir: .
-    buildCommand: npm ci && npm run build:expert
+    # NODE_ENV=production (set below) makes npm omit devDependencies, but the build
+    # needs them (typescript, prisma, tsx for the postinstall + build:expert steps).
+    # --include=dev forces them in for the build; the runtime start only needs deps.
+    buildCommand: npm ci --include=dev && npm run build:expert
     startCommand: npm run start --workspace @probe/expert
     healthCheckPath: /health
     envVars:
@@ -57,7 +60,18 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
 
       # --- Mongo question bank — optional, falls back to the seeded Postgres bank ---
       - key: MONGODB_URI
         sync: false
+
+      # --- Deepgram live transcription — optional. Without it, transcription is off
+      #     (the room still works). Set the key to enable server-side STT for copilot. ---
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: DEEPGRAM_STT_MODEL
+        value: nova-2
+      - key: DEEPGRAM_LANGUAGE
+        value: en

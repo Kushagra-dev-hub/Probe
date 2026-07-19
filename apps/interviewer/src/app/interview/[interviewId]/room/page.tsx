@@ -575,7 +575,9 @@ function InterviewerRoom() {
         requestCopilotScorecard,
         seedCopilotState,
         changeSurface,
-        sendTranscript,
+        startAudio,
+        sendAudioChunk,
+        stopAudio,
         analyzeAnswer,
         reload,
     } = useInterviewRoom(identifier);
@@ -1987,10 +1989,12 @@ function InterviewerRoom() {
                             </div>
                         )}
 
-                        {/* Headless: transcribe the interviewer's own mic into conversation memory. */}
+                        {/* Headless: stream the interviewer's own mic to Deepgram (server-side). */}
                         <SpeechCapture
                             enabled={speechEnabled}
-                            onTranscript={(text, isFinal) => sendTranscript(text, isFinal, "interviewer")}
+                            onStart={() => startAudio("interviewer")}
+                            onAudio={sendAudioChunk}
+                            onStop={stopAudio}
                         />
                     </section>
                 </main>

@@ -428,6 +428,15 @@ export interface ClientToServerEvents {
   ) => void;
   /** Both sides stream their own mic transcript into conversation memory. */
   "direct:transcript": (p: TranscriptEntry) => void;
+  /**
+   * Server-side Deepgram transcription. Each side opens a stream for its own mic
+   * (`audio-start`), pushes raw 16 kHz linear16 PCM frames (`audio-chunk`), and
+   * closes on mute/leave (`audio-stop`). The expert proxies to Deepgram and feeds
+   * the resulting transcript into the same `transcript-entry`/copilot path.
+   */
+  "direct:audio-start": (p: { interviewId: string; speaker: "interviewer" | "interviewee" }) => void;
+  "direct:audio-chunk": (chunk: ArrayBuffer) => void;
+  "direct:audio-stop": (p: { interviewId: string }) => void;
   /** Interviewer marks the candidate's current answer complete → analyze it now. */
   "direct:analyze-answer": (p: { interviewId: string }, ack?: (r: Ack) => void) => void;
 }
