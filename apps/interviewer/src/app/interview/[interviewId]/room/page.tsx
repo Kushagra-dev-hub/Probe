@@ -1222,7 +1222,7 @@ function InterviewerRoom() {
 
     if (loading) {
         return (
-            <main className="grid min-h-full place-items-center bg-[#FAFBFC] p-8 dark:bg-lc-bg">
+            <main className="grid min-h-full place-items-center bg-[#FAFBFC] p-8 dark:bg-[#141416]">
                 <div className="size-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
             </main>
         );
@@ -1230,7 +1230,7 @@ function InterviewerRoom() {
 
     if (!bootstrap && error) {
         return (
-            <main className="fixed inset-0 z-[100] grid place-items-center bg-[#FAFBFC] px-6 dark:bg-lc-bg">
+            <main className="fixed inset-0 z-[100] grid place-items-center bg-[#FAFBFC] px-6 dark:bg-[#141416]">
                 <section className="max-w-md space-y-5 text-center">
                     <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-slate-100 dark:bg-white/[0.06]">
                         <span className="material-symbols-outlined text-4xl text-slate-500">event_busy</span>
@@ -1247,7 +1247,7 @@ function InterviewerRoom() {
 
     if (sessionEnded || ended || status === "completed") {
         return (
-            <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#FAFBFC] px-4 py-10 dark:bg-lc-bg">
+            <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#FAFBFC] px-4 py-10 dark:bg-[#141416]">
                 <div className="mx-auto max-w-5xl">
                     <div className="mb-8 flex items-center gap-3">
                         <div className="grid size-11 place-items-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
@@ -1282,7 +1282,7 @@ function InterviewerRoom() {
                                     {RECOMMENDATION_OPTIONS.map((option) => {
                                         const active = evaluationRecommendation === option.value;
                                         return (
-                                            <button key={option.value} type="button" onClick={() => setEvaluationRecommendation(option.value)} className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-bold transition-colors ${active ? option.activeClass : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-bg"}`}>
+                                            <button key={option.value} type="button" onClick={() => setEvaluationRecommendation(option.value)} className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-bold transition-colors ${active ? option.activeClass : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-[#1c1c1f]"}`}>
                                                 <span className="material-symbols-outlined text-[16px]">{option.icon}</span>
                                                 {option.label}
                                             </button>
@@ -1302,8 +1302,8 @@ function InterviewerRoom() {
                             <div>
                                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Strengths</label>
                                 <div className="mt-2 flex gap-2">
-                                    <input value={strengthInput} onChange={(event) => setStrengthInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addStrength(); } }} placeholder="Add a strength and press Enter" className="h-10 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 dark:border-lc-border dark:bg-lc-bg dark:text-slate-200" />
-                                    <button type="button" onClick={addStrength} className="rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-bg">Add</button>
+                                    <input value={strengthInput} onChange={(event) => setStrengthInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addStrength(); } }} placeholder="Add a strength and press Enter" className="h-10 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 dark:border-lc-border dark:bg-[#141416] dark:text-slate-200" />
+                                    <button type="button" onClick={addStrength} className="rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-[#1c1c1f]">Add</button>
                                 </div>
                                 {evaluationStrengths.length > 0 && (
                                     <div className="mt-2 flex flex-wrap gap-2">
@@ -1320,8 +1320,8 @@ function InterviewerRoom() {
                             <div>
                                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Areas of concern</label>
                                 <div className="mt-2 flex gap-2">
-                                    <input value={concernInput} onChange={(event) => setConcernInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addConcern(); } }} placeholder="Add a concern and press Enter" className="h-10 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 dark:border-lc-border dark:bg-lc-bg dark:text-slate-200" />
-                                    <button type="button" onClick={addConcern} className="rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-bg">Add</button>
+                                    <input value={concernInput} onChange={(event) => setConcernInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addConcern(); } }} placeholder="Add a concern and press Enter" className="h-10 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 dark:border-lc-border dark:bg-[#141416] dark:text-slate-200" />
+                                    <button type="button" onClick={addConcern} className="rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-[#1c1c1f]">Add</button>
                                 </div>
                                 {evaluationConcerns.length > 0 && (
                                     <div className="mt-2 flex flex-wrap gap-2">
@@ -1337,7 +1337,7 @@ function InterviewerRoom() {
 
                             <div>
                                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Summary / feedback</label>
-                                <textarea value={evaluationNotes} onChange={(event) => setEvaluationNotes(event.target.value)} placeholder="Overall assessment of the candidate's performance…" className="mt-2 min-h-32 w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold leading-6 text-slate-700 placeholder:font-normal dark:border-lc-border dark:bg-lc-bg dark:text-slate-200" />
+                                <textarea value={evaluationNotes} onChange={(event) => setEvaluationNotes(event.target.value)} placeholder="Overall assessment of the candidate's performance…" className="mt-2 min-h-32 w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold leading-6 text-slate-700 placeholder:font-normal dark:border-lc-border dark:bg-[#141416] dark:text-slate-200" />
                             </div>
 
                             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -1357,7 +1357,7 @@ function InterviewerRoom() {
     }
 
     return (
-        <div className="fixed inset-0 z-[100] overflow-hidden bg-[#FAFBFC] dark:bg-lc-bg">
+        <div className="fixed inset-0 z-[100] overflow-hidden bg-[#FAFBFC] dark:bg-[#141416]">
             {endConfirm && (
                 <div className="fixed inset-0 z-[120] grid place-items-center bg-black/40 px-4" onClick={() => setEndConfirm(false)}>
                     <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-lc-border dark:bg-lc-surface" onClick={(event) => event.stopPropagation()}>
@@ -1367,7 +1367,7 @@ function InterviewerRoom() {
                         <h2 className="mt-4 font-nunito text-lg font-bold text-slate-900 dark:text-white">End this interview?</h2>
                         <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">The candidate&apos;s room will close and they&apos;ll see a completion screen. You&apos;ll then submit your evaluation. This can&apos;t be undone.</p>
                         <div className="mt-5 flex justify-end gap-3">
-                            <button type="button" onClick={() => setEndConfirm(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-lc-bg">Cancel</button>
+                            <button type="button" onClick={() => setEndConfirm(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50 dark:border-lc-border dark:text-slate-300 dark:hover:bg-[#1c1c1f]">Cancel</button>
                             <button type="button" onClick={endInterview} className="rounded-lg bg-[#E11D48] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#BE123C]">End interview</button>
                         </div>
                     </div>
@@ -1481,7 +1481,7 @@ function InterviewerRoom() {
                                         {questionError && <div className="text-sm font-semibold text-red-600 dark:text-red-400">{questionError}</div>}
                                         {questionDetails ? (
                                             <>
-                                                <div className="prose prose-base max-w-none dark:prose-invert prose-pre:border prose-pre:border-slate-200 prose-pre:bg-slate-50 prose-pre:text-slate-800 dark:prose-pre:border-lc-border dark:prose-pre:bg-lc-bg dark:prose-pre:text-[#d4d4d4]">
+                                                <div className="prose prose-base max-w-none dark:prose-invert prose-pre:border prose-pre:border-slate-200 prose-pre:bg-slate-50 prose-pre:text-slate-800 dark:prose-pre:border-lc-border dark:prose-pre:bg-[#141416] dark:prose-pre:text-[#d4d4d4]">
                                                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, rehypeSanitize, [rehypeKatex, { strict: false, throwOnError: false }]] as any}>
                                                         {normalizeQuestionMarkdown(questionDetails.statement || questionDetails.problemMd || questionDetails.problem_md || questionDetails.description || "")}
                                                     </ReactMarkdown>
@@ -1490,7 +1490,7 @@ function InterviewerRoom() {
                                                     <div className="space-y-3">
                                                         <h3 className="text-[13px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Examples</h3>
                                                         {questionDetails.examples.map((example, index) => (
-                                                            <div key={index} className="space-y-2 rounded-lg bg-[#F8FAFC] p-4 font-mono text-[13px] text-slate-800 dark:bg-lc-bg dark:text-[#d4d4d4]">
+                                                            <div key={index} className="space-y-2 rounded-lg bg-[#F8FAFC] p-4 font-mono text-[13px] text-slate-800 dark:bg-[#141416] dark:text-[#d4d4d4]">
                                                                 <div className="font-bold text-slate-900 dark:text-white">Example {index + 1}</div>
                                                                 {formatValue(example.input).trim() && <div><span className="font-bold opacity-60">Input:</span> {formatValue(example.input)}</div>}
                                                                 {formatValue(example.output).trim() && <div><span className="font-bold opacity-60">Output:</span> {formatValue(example.output)}</div>}
@@ -1514,7 +1514,7 @@ function InterviewerRoom() {
                                                     return (
                                                         <div className="space-y-3">
                                                             <h3 className="text-[13px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Constraints</h3>
-                                                            <div className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-lc-bg">
+                                                            <div className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-[#141416]">
                                                                 <ul className="list-disc space-y-1.5 pl-4 font-mono text-[13px] text-slate-800 marker:text-slate-400 dark:text-[#d4d4d4]">
                                                                     {lines.map((line, index) => <li key={index}>{normalizePlainMathText(line)}</li>)}
                                                                 </ul>
@@ -1533,7 +1533,7 @@ function InterviewerRoom() {
                                                 )}
                                             </>
                                         ) : (
-                                            <div className="rounded-lg bg-[#F8FAFC] p-4 text-sm font-semibold text-slate-600 dark:bg-lc-bg dark:text-slate-300">
+                                            <div className="rounded-lg bg-[#F8FAFC] p-4 text-sm font-semibold text-slate-600 dark:bg-[#141416] dark:text-slate-300">
                                                 The candidate solves here while you observe, run code, and guide the final interview.
                                             </div>
                                         )}
@@ -1563,11 +1563,11 @@ function InterviewerRoom() {
 
                                 {leftTab === "notes" && (
                                     <div className="space-y-3">
-                                        <div className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-lc-bg">
+                                        <div className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-[#141416]">
                                             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Interviewer notes</p>
                                             <p className="mt-2 whitespace-pre-line text-sm text-slate-700 dark:text-slate-200">{bootstrap?.interviewerNotes || "No interviewer notes assigned."}</p>
                                         </div>
-                                        <div className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-lc-bg">
+                                        <div className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-[#141416]">
                                             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Candidate</p>
                                             <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{bootstrap?.candidate.name}</p>
                                             <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{bootstrap?.candidate.email}</p>
@@ -1579,7 +1579,7 @@ function InterviewerRoom() {
                                     <div className="space-y-3">
                                         {questionDetails?.hints && questionDetails.hints.length > 0 ? (
                                             questionDetails.hints.map((hint, index) => (
-                                                <div key={index} className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-lc-bg">
+                                                <div key={index} className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-[#141416]">
                                                     <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Hint {index + 1}</div>
                                                     <p className="text-[13px] text-slate-700 dark:text-slate-200">{hint}</p>
                                                 </div>
@@ -1606,12 +1606,12 @@ function InterviewerRoom() {
                                         onChange={(event) => updateLanguage(event.target.value)}
                                         disabled
                                         title="Candidate controls the live editor language"
-                                        className="rounded-xl border border-slate-200 bg-slate-100 px-2 py-1 text-[12px] font-bold text-slate-700 disabled:opacity-70 dark:border-lc-border dark:bg-lc-bg dark:text-white"
+                                        className="rounded-xl border border-slate-200 bg-slate-100 px-2 py-1 text-[12px] font-bold text-slate-700 disabled:opacity-70 dark:border-lc-border dark:bg-[#141416] dark:text-white"
                                     >
                                         {EDITOR_LANGUAGES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 ) : (
-                                    <span className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 px-2.5 py-1 text-[12px] font-bold uppercase text-slate-600 dark:border-lc-border dark:bg-lc-bg dark:text-slate-200">{activeSurface === "sql" ? "SQL" : <><span className="material-symbols-outlined text-[15px]">design_services</span>System Design</>}</span>
+                                    <span className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 px-2.5 py-1 text-[12px] font-bold uppercase text-slate-600 dark:border-lc-border dark:bg-[#141416] dark:text-slate-200">{activeSurface === "sql" ? "SQL" : <><span className="material-symbols-outlined text-[15px]">design_services</span>System Design</>}</span>
                                 )}
                                 <div className="ml-auto flex items-center gap-2">
                                     {isCodingSurface && (
@@ -1648,7 +1648,7 @@ function InterviewerRoom() {
                                         </button>
                                     )}
                                     {activeSurface === "design" && (
-                                        <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-500 dark:bg-lc-bg dark:text-slate-400">Live whiteboard — synced</span>
+                                        <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-500 dark:bg-[#141416] dark:text-slate-400">Live whiteboard — synced</span>
                                     )}
                                 </div>
                             </div>
@@ -1661,7 +1661,7 @@ function InterviewerRoom() {
                                         <p className="text-xs text-slate-400">This round has no attached question. Open a different round or edit the interview to add one.</p>
                                     </div>
                                 ) : activeSurface === "design" ? (
-                                    <DesignBoard value={code} readOnly onChange={undefined} theme="light" />
+                                    <DesignBoard value={code} readOnly onChange={undefined} theme="dark" />
                                 ) : (
                                     <MonacoEditor
                                         height="100%"
@@ -1673,7 +1673,7 @@ function InterviewerRoom() {
                                             codeDraftsRef.current[draftKeyFor(language)] = nextCode;
                                             setCode(nextCode);
                                         }}
-                                        theme="light"
+                                        theme="vs-dark"
                                         options={{
                                             minimap: { enabled: false },
                                             fontSize: 14,
@@ -1941,7 +1941,7 @@ function InterviewerRoom() {
                                     type="button"
                                     onClick={() => launchSurface("meet")}
                                     title="Back to the meeting"
-                                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors ${meetActive ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-lc-bg"}`}
+                                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors ${meetActive ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[#1c1c1f]"}`}
                                 >
                                     <span className="material-symbols-outlined text-[18px]">{SURFACE_META.meet.icon}</span>
                                     <span className="hidden sm:inline">{SURFACE_META.meet.label}</span>
@@ -1955,7 +1955,7 @@ function InterviewerRoom() {
                                             type="button"
                                             onClick={() => launchSurface(surface)}
                                             title={meta.label}
-                                            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors ${active ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-lc-bg"}`}
+                                            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors ${active ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[#1c1c1f]"}`}
                                         >
                                             <span className="material-symbols-outlined text-[18px]">{meta.icon}</span>
                                             <span className="hidden sm:inline">{meta.label}</span>
@@ -1970,7 +1970,7 @@ function InterviewerRoom() {
                                     onClick={() => setResumeOpen((value) => !value)}
                                     disabled={!hasResume}
                                     title={hasResume ? "Toggle candidate resume" : "No resume yet"}
-                                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${resumeOpen ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-lc-bg"}`}
+                                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${resumeOpen ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[#1c1c1f]"}`}
                                 >
                                     <span className="material-symbols-outlined text-[18px]">description</span>
                                     <span className="hidden sm:inline">Resume</span>
@@ -1979,7 +1979,7 @@ function InterviewerRoom() {
                                     type="button"
                                     onClick={handleRequestScreenShare}
                                     title="Ask the candidate to share their screen"
-                                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors ${screenLive ? "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-lc-bg"}`}
+                                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors ${screenLive ? "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[#1c1c1f]"}`}
                                 >
                                     <span className="material-symbols-outlined text-[18px]">screen_share</span>
                                     <span className="hidden md:inline">{screenLive ? "Sharing" : "Screen"}</span>

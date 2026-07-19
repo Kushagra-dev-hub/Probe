@@ -937,7 +937,7 @@ function CandidateRoom() {
 
     if (loading) {
         return (
-            <main className="grid min-h-full place-items-center bg-[#FAFBFC] p-8 dark:bg-lc-bg">
+            <main className="grid min-h-full place-items-center bg-[#FAFBFC] p-8 dark:bg-[#141416]">
                 <div className="size-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
             </main>
         );
@@ -945,7 +945,7 @@ function CandidateRoom() {
 
     if (!bootstrap && error) {
         return (
-            <main className="fixed inset-0 z-[100] grid place-items-center bg-[#FAFBFC] px-6 dark:bg-lc-bg">
+            <main className="fixed inset-0 z-[100] grid place-items-center bg-[#FAFBFC] px-6 dark:bg-[#141416]">
                 <section className="max-w-md space-y-5 text-center">
                     <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-slate-100 dark:bg-white/[0.06]">
                         <span className="material-symbols-outlined text-4xl text-slate-500">event_busy</span>
@@ -962,7 +962,7 @@ function CandidateRoom() {
 
     if (sessionEnded || status === "completed") {
         return (
-            <div className="fixed inset-0 z-[100] grid place-items-center bg-[#FAFBFC] px-6 dark:bg-lc-bg">
+            <div className="fixed inset-0 z-[100] grid place-items-center bg-[#FAFBFC] px-6 dark:bg-[#141416]">
                 <div className="max-w-md space-y-6 text-center">
                     <div className="mx-auto flex size-20 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/15">
                         <span className="material-symbols-outlined text-5xl text-emerald-600 dark:text-emerald-400">task_alt</span>
@@ -983,7 +983,7 @@ function CandidateRoom() {
 
     if (!admitted) {
         return (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#FAFBFC] px-6 dark:bg-lc-bg">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#FAFBFC] px-6 dark:bg-[#141416]">
                 <div className="max-w-md space-y-6 text-center">
                     <button type="button" onClick={() => router.push("/")} className="mx-auto inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition-colors hover:text-primary dark:text-slate-300">
                         <span className="material-symbols-outlined text-[18px]">arrow_back</span>
@@ -1166,7 +1166,7 @@ function CandidateRoom() {
 
             <main className="relative min-h-0 flex-1 overflow-hidden">
                 {!isMeet && (
-                    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#FAFBFC] text-slate-900 dark:bg-lc-bg dark:text-white xl:flex-row">
+                    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#FAFBFC] text-slate-900 dark:bg-[#141416] dark:text-white xl:flex-row">
                         <aside style={{ "--left-w": `${leftWidth}px` } as React.CSSProperties} className="flex w-full shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white dark:border-lc-border dark:bg-lc-surface xl:w-[var(--left-w)]">
                             <div className="flex items-center gap-1 border-b border-slate-100 px-4 dark:border-lc-border">
                                 {(["problem", "instructions"] as const).map((tab) => (
@@ -1190,7 +1190,7 @@ function CandidateRoom() {
                                         {questionError && <div className="text-sm font-semibold text-red-600 dark:text-red-400">{questionError}</div>}
                                         {questionDetails ? (
                                             <>
-                                                <div className="prose prose-base max-w-none dark:prose-invert prose-pre:border prose-pre:border-slate-200 prose-pre:bg-slate-50 prose-pre:text-slate-800 dark:prose-pre:border-lc-border dark:prose-pre:bg-lc-bg dark:prose-pre:text-[#d4d4d4]">
+                                                <div className="prose prose-base max-w-none dark:prose-invert prose-pre:border prose-pre:border-slate-200 prose-pre:bg-slate-50 prose-pre:text-slate-800 dark:prose-pre:border-lc-border dark:prose-pre:bg-[#141416] dark:prose-pre:text-[#d4d4d4]">
                                                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, rehypeSanitize, [rehypeKatex, { strict: false, throwOnError: false }]] as any}>
                                                         {normalizeQuestionMarkdown(questionDetails.statement || questionDetails.problemMd || questionDetails.problem_md || questionDetails.description || "")}
                                                     </ReactMarkdown>
@@ -1199,7 +1199,7 @@ function CandidateRoom() {
                                                     <div className="space-y-3">
                                                         <h3 className="text-[13px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Examples</h3>
                                                         {questionDetails.examples.map((example, index) => (
-                                                            <div key={index} className="space-y-2 rounded-lg bg-[#F8FAFC] p-4 font-mono text-[13px] text-slate-800 dark:bg-lc-bg dark:text-[#d4d4d4]">
+                                                            <div key={index} className="space-y-2 rounded-lg bg-[#F8FAFC] p-4 font-mono text-[13px] text-slate-800 dark:bg-[#141416] dark:text-[#d4d4d4]">
                                                                 <div className="font-bold text-slate-900 dark:text-white">Example {index + 1}</div>
                                                                 {formatValue(example.input).trim() && <div><span className="font-bold opacity-60">Input:</span> {formatValue(example.input)}</div>}
                                                                 {formatValue(example.output).trim() && <div><span className="font-bold opacity-60">Output:</span> {formatValue(example.output)}</div>}
@@ -1223,7 +1223,7 @@ function CandidateRoom() {
                                                     return (
                                                         <div className="space-y-3">
                                                             <h3 className="text-[13px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Constraints</h3>
-                                                            <div className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-lc-bg">
+                                                            <div className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-[#141416]">
                                                                 <ul className="list-disc space-y-1.5 pl-4 font-mono text-[13px] text-slate-800 marker:text-slate-400 dark:text-[#d4d4d4]">
                                                                     {lines.map((line, index) => <li key={index}>{normalizePlainMathText(line)}</li>)}
                                                                 </ul>
@@ -1235,18 +1235,18 @@ function CandidateRoom() {
                                                 {surface === "design" && <DesignExtras followUps={(questionDetails as any)?.designMeta?.followUpQuestions} hints={(questionDetails as any)?.hints} />}
                                             </>
                                         ) : (
-                                            <div className="rounded-lg bg-[#F8FAFC] p-4 text-sm font-semibold text-slate-600 dark:bg-lc-bg dark:text-slate-300">Think out loud, explain tradeoffs, and submit when your solution is ready.</div>
+                                            <div className="rounded-lg bg-[#F8FAFC] p-4 text-sm font-semibold text-slate-600 dark:bg-[#141416] dark:text-slate-300">Think out loud, explain tradeoffs, and submit when your solution is ready.</div>
                                         )}
                                     </div>
                                 )}
 
                                 {leftTab === "instructions" && (
                                     <div className="space-y-3">
-                                        <div className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-lc-bg">
+                                        <div className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-[#141416]">
                                             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Candidate instructions</p>
                                             <p className="mt-2 whitespace-pre-line text-sm text-slate-700 dark:text-slate-200">{bootstrap?.candidateInstructions || "Follow the interviewer instructions during the session."}</p>
                                         </div>
-                                        <div className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-lc-bg">
+                                        <div className="rounded-lg bg-[#F8FAFC] p-4 dark:bg-[#141416]">
                                             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Schedule</p>
                                             <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{formatDateTime(bootstrap?.scheduledAt)}</p>
                                             <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{bootstrap?.durationMinutes || 60} minutes</p>
@@ -1261,11 +1261,11 @@ function CandidateRoom() {
                         <section className="flex min-w-0 flex-1 flex-col overflow-hidden border-l border-slate-200 bg-white dark:border-lc-border dark:bg-lc-surface">
                             <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 dark:border-lc-border">
                                 {surface === "dsa" ? (
-                                    <select value={language} onChange={(event) => updateLanguage(event.target.value)} disabled={Boolean(sessionEnded)} className="rounded-xl border border-slate-200 bg-slate-100 px-2 py-1 text-[12px] font-bold text-slate-700 disabled:opacity-60 dark:border-lc-border dark:bg-lc-bg dark:text-white">
+                                    <select value={language} onChange={(event) => updateLanguage(event.target.value)} disabled={Boolean(sessionEnded)} className="rounded-xl border border-slate-200 bg-slate-100 px-2 py-1 text-[12px] font-bold text-slate-700 disabled:opacity-60 dark:border-lc-border dark:bg-[#141416] dark:text-white">
                                         {EDITOR_LANGUAGES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 ) : (
-                                    <span className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 px-2.5 py-1 text-[12px] font-bold uppercase text-slate-600 dark:border-lc-border dark:bg-lc-bg dark:text-slate-200">{surface === "sql" ? "SQL" : <><span className="material-symbols-outlined text-[15px]">design_services</span>System Design</>}</span>
+                                    <span className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 px-2.5 py-1 text-[12px] font-bold uppercase text-slate-600 dark:border-lc-border dark:bg-[#141416] dark:text-slate-200">{surface === "sql" ? "SQL" : <><span className="material-symbols-outlined text-[15px]">design_services</span>System Design</>}</span>
                                 )}
                                 <div className="ml-auto flex items-center gap-2">
                                     {surface === "dsa" && (
@@ -1300,9 +1300,9 @@ function CandidateRoom() {
                                         <p className="text-xs text-slate-400">The interviewer will open a different round.</p>
                                     </div>
                                 ) : isDesign ? (
-                                    <DesignBoard value={code} readOnly={false} onChange={handleDesignChange} theme="light" />
+                                    <DesignBoard value={code} readOnly={false} onChange={handleDesignChange} theme="dark" />
                                 ) : (
-                                    <MonacoEditor key={`${activeQuestion?.id || "question"}:${language}`} height="100%" language={monacoLanguage(language)} defaultValue={code} onMount={(editor) => { mainEditorRef.current = editor; if (code && editor.getValue() !== code) editor.setValue(code); }} onChange={(value) => updateCode(value || "")} theme="light" options={{ minimap: { enabled: false }, fontSize: 14, readOnly: Boolean(sessionEnded), wordWrap: "on", automaticLayout: true, scrollBeyondLastLine: false }} />
+                                    <MonacoEditor key={`${activeQuestion?.id || "question"}:${language}`} height="100%" language={monacoLanguage(language)} defaultValue={code} onMount={(editor) => { mainEditorRef.current = editor; if (code && editor.getValue() !== code) editor.setValue(code); }} onChange={(value) => updateCode(value || "")} theme="vs-dark" options={{ minimap: { enabled: false }, fontSize: 14, readOnly: Boolean(sessionEnded), wordWrap: "on", automaticLayout: true, scrollBeyondLastLine: false }} />
                                 )}
                             </div>
 
