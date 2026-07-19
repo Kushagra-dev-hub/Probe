@@ -806,10 +806,15 @@ async function buildBootstrap(
  * ------------------------------------------------------------------ */
 io.use(async (socket, next) => {
   const token = (socket.handshake.auth as { token?: string } | undefined)?.token;
-  const user = await authenticateToken(token);
-  if (!user) return next(new Error("Unauthorized"));
-  socket.data.user = user;
-  next();
+  try {
+    const user = await authenticateToken(token);
+    if (!user) return next(new Error("Unauthorized"));
+    socket.data.user = user;
+    next();
+  } catch (err) {
+    app.log.error(err, "socket auth failed");
+    next(new Error("Unauthorized"));
+  }
 });
 
 io.on("connection", (socket) => {
