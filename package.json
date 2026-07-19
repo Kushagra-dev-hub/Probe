@@ -8,6 +8,7 @@
     "apps/*"
   ],
   "scripts": {
+    "postinstall": "npm run build --workspace @probe/contract",
     "dev:expert": "npm run dev --workspace @probe/expert",
     "dev:interviewer": "npm run dev --workspace @probe/interviewer",
     "dev:interviewee": "npm run dev --workspace @probe/interviewee",
@@ -15,7 +16,8 @@
     "db:push": "npm run push --workspace @probe/db",
     "db:seed": "npm run seed --workspace @probe/db",
     "db:reset": "npm run reset --workspace @probe/db",
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build --workspace @probe/contract && npm run build --workspace @probe/db && npm run build --workspace @probe/expert && npm run build --workspace @probe/interviewer && npm run build --workspace @probe/interviewee",
+    "build:expert": "npm run build --workspace @probe/contract && npm run build --workspace @probe/db && npm run build --workspace @probe/expert",
     "type-check": "npm run type-check --workspaces --if-present"
   },
   "engines": {

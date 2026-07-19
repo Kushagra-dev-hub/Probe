@@ -1,0 +1,63 @@
+services:
+  - type: web
+    name: probe-expert
+    runtime: node
+    plan: starter
+    region: oregon
+    branch: main
+    rootDir: .
+    buildCommand: npm ci && npm run build:expert
+    startCommand: npm run start --workspace @probe/expert
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: EXPERT_HOST
+        value: "0.0.0.0"
+
+      # --- Database (Supabase Postgres — same project the frontends use) ---
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+
+      # --- Supabase (leave unset to keep the dev-token auth fallback; set both
+      #     to switch the room to real Supabase JWT auth) ---
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # --- Socket auth secret — Render generates a real random value for you ---
+      - key: AUTH_SECRET
+        generateValue: true
+
+      # --- CORS allowlist: the deployed frontend origins (Vercel URLs) ---
+      - key: FRONTEND_URL
+        sync: false
+      - key: COMPANY_FRONTEND_URL
+        sync: false
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+      - key: NEXT_PUBLIC_COMPANY_APP_URL
+        sync: false
+
+      # --- Judge0 (code execution) — optional, "Run" is disabled without it ---
+      - key: JUDGE0_API_URL
+        sync: false
+      - key: JUDGE0_API_KEY
+        sync: false
+      - key: JUDGE0_PROVIDER
+        value: auto
+
+      # --- Probe copilot (LLM) — optional, falls back to a deterministic rubric ---
+      - key: GOOGLE_GENERATIVE_AI_API_KEY
+        sync: false
+      - key: XAI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+      # --- Mongo question bank — optional, falls back to the seeded Postgres bank ---
+      - key: MONGODB_URI
+        sync: false

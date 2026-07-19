@@ -1,8 +1,12 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true,
-    "types": ["node"]
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"],
+    "noEmit": false
   },
-  "include": ["src", "prisma"]
+  "include": ["src"]
 }

@@ -25,7 +25,9 @@ export function getExpertConfig() {
 
   return {
     host: process.env.EXPERT_HOST || "::",
-    port: Number.parseInt(process.env.EXPERT_PORT || "3004", 10),
+    // PORT is the platform-standard var (Render/Heroku/etc. inject it); EXPERT_PORT
+    // is the local-dev override. PORT wins so the service binds where the host expects.
+    port: Number.parseInt(process.env.PORT || process.env.EXPERT_PORT || "3004", 10),
     allowedOrigins,
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
     supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
